@@ -1,0 +1,35 @@
+h1. eCSStender.CSS3-grid-alignment.js
+
+An implementation of the CSS3 Grid Alignment module using eCSStender.
+
+h2. Current Version
+
+0.0 (2011-06-23)
+
+h2. Requirements
+
+None.
+
+h2. What's new in this release?
+
+See the CHANGELOG file for information on what's new.
+
+h2. The distribution
+
+Besides the eCSStender.CSS3-grid-alignment.js file in /src (and /min), there's a
+test tree (/test) included which holds assorted tests for the module.
+
+h2. Submodules
+
+The following submodules are included in the /test folder and will need updating:
+
+* eCSStender
+
+To update, run this in the root folder of the project: 
+
+$> git submodule init && git submodule update
+
+h2. License
+
+eCSStender.CSS3-grid-alignment.js is licensed under the terms of the MIT License,
+see the included MIT-LICENSE file.
