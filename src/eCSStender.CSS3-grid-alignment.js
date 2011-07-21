@@ -46,121 +46,267 @@ Note:						If you change or improve on this script, please let us know by
 	BLOCKPROGRESSION	= "block-progression",
 
 	precision					= 2,
-	agentTruncatesLayoutLengths	= true,
+	agentTruncatesLayoutLengths	= TRUE,
 
 	regexSpaces = /\s+/,
-
+	intrinsicSizeCalculatorElement			= NULL,
+	intrinsicSizeCalculatorElementParent	= NULL,
+	
+	calculatorOperationEnum					= {
+		minWidth: {},
+		maxWidth: {},
+		minHeight: {},
+		maxHeight: {},
+		shrinkToFit: {}
+	},
 	gridTrackValueEnum = {
-	    auto: { keyword: "auto" },
-	    minContent: { keyword: "min-content" },
-	    maxContent: { keyword: "max-content" },
-	    fitContent: { keyword: "fit-content" },
-	    minmax: { keyword: "minmax" }
+		  auto: { keyword: "auto" },
+		  minContent: { keyword: "min-content" },
+		  maxContent: { keyword: "max-content" },
+		  fitContent: { keyword: "fit-content" },
+		  minmax: { keyword: "minmax" }
 	},
 	gridAlignEnum = {
-	    stretch: { keyword: "stretch" },
-	    start: { keyword: "start" },
-	    end: { keyword: "end" },
-	    center: { keyword: "center" }
+		  stretch: { keyword: "stretch" },
+		  start: { keyword: "start" },
+		  end: { keyword: "end" },
+		  center: { keyword: "center" }
 	},
 	positionEnum = {
-	    static: { keyword: "static" },
-	    relative: { keyword: "relative" },
-	    absolute: { keyword: "absolute" },
-	    fixed: { keyword: "fixed" }
+		  'static': { keyword: "static" },
+		  relative: { keyword: "relative" },
+		  absolute: { keyword: "absolute" },
+		  fixed: { keyword: "fixed" }
 	},
 	blockProgressionEnum = {
-	    tb: { keyword: "tb" },
-	    bt: { keyword: "bt" },
-	    lr: { keyword: "lr" },
-	    rl: { keyword: "rl" }
+		  tb: { keyword: "tb" },
+		  bt: { keyword: "bt" },
+		  lr: { keyword: "lr" },
+		  rl: { keyword: "rl" }
 	},
 	sizingTypeEnum = {
-	    valueAndUnit: {},
-	    keyword: {}
-	};
-	  
+		  valueAndUnit: {},
+		  keyword: {}
+	},
+	
+	// aliasing eCSStender's built-ins
+	getCSSValue = e.getCSSValue;
+	
+	// helpers
+	function defined( test )
+	{
+		return test != UNDEFINED;
+	}
+	function select( selector, context )
+	{
+		if ( defined( document.querySelectorAll ) )
+		{
+			select = function( selector, context )
+			{
+				return (context||document).querySelectorAll(selector);
+			};
+		}
+		// jQuery fallback
+		else
+		{
+			if ( ! defined( window.jQuery ) )
+			{
+				e.loadScript(
+					'http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js',
+					function(){
+						select( selector, context );
+					});
+			}
+			select = function( selector, context )
+			{
+				return window.jQuery(selector, context).get();
+			};
+		}
+		return select( selector, context );
+	}
+	function elementMatchesSelector( element, selector )
+	{
+		if ( defined( element.matchesSelector ) )
+		{
+			elementMatchesSelector = function( element, selector )
+			{
+				return element.matchesSelector( selector );
+			};
+		}
+		else if ( defined( element.mozMatchesSelector ) )
+		{
+			elementMatchesSelector = function( element, selector )
+			{
+				return element.mozMatchesSelector( selector );
+			};
+		}
+		else if ( defined( element.webkitMatchesSelector ) )
+		{
+			elementMatchesSelector = function( element, selector )
+			{
+				return element.webkitMatchesSelector( selector );
+			};
+		}
+		else
+		{
+			var
+			testStyleSheet = e.newStyleElement('screen','selector-matching-test',false);
+			elementMatchesSelector = function( element, selector )
+			{
+				var
+				property	= 'page-break-after',
+				value		= 'avoid',
+				ret;
+				
+				e.addRules( testStyleSheet, selector+'{'+property+':'+value+'};' );
+				ret = ( e.getCSSValue( element, property ) == value );
+				emptyStyleSheet( testStyleSheet );
+				return ret;
+			};
+		}
+		return elementMatchesSelector( element, selector );
+	}
+	function emptyStyleSheet( stylesheet )
+	{
+		if ( defined( stylesheet.styleSheet ) )
+		{
+			emptyStyleSheet = function( stylesheet ) 
+			{
+				stylesheet.styleSheet.cssText = '';
+			};
+		}
+		else
+		{
+			emptyStyleSheet = function( stylesheet ) 
+			{
+				stylesheet.innerHTML = '';
+			};
+		}
+		emptyStyleSheet( stylesheet );
+	}
+		
 	e.register(
 		{
-			fragment: DISPLAY,
-			filter: {
-			value: /(inline-)?grid/
+			property:		DISPLAY,
+			filter:			{ value: /(inline-)?grid/ },
+			test:			function()
+			{
+				return ! e.isSupported( PROPERTY, DISPLAY, GRID );
+			},
+			fingerprint:	'net.easy-designs.' + GRID
 		},
-		test: function()
+		'*',
+		function( selector, properties, media, specificity )
 		{
-			return ( ! e.isSupported( PROPERTY, DISPLAY, GRID ) &&
-					 ( e.isSupported( PROPERTY, DISPLAY, KHTML + GRID ) ||
-					   e.isSupported( PROPERTY, DISPLAY, MOZ + GRID ) ||
-					   e.isSupported( PROPERTY, DISPLAY, MS + GRID ) ||
-					   e.isSupported( PROPERTY, DISPLAY, OPERA + GRID ) ||
-					   e.isSupported( PROPERTY, DISPLAY, WEBKIT + GRID ) ) );
-		},
-		fingerprint: 'net.easy-designs.' + GRID
-	  },
-	  false,
-	  gridify
-	);
+			var bullpen = e.lookup(
+				{ fragment: GRID },
+				'*'
+			);
+
+			function gridify( selector, properties, media, specificity )
+			{
+				var
+				els		= select( selector ),
+				eLen	= els.length,
+				children, grid_items, c, b, found, f;
+
+				// loop
+				while ( eLen-- )
+				{
+					children	= els[eLen].children;
+					grid_items	= [];
+
+					// determine which elements in the bullpen are 
+					// actual children of this element
+					c = children.length;
+					while ( c-- )
+					{
+						b = bullpen.length;
+						while ( b-- )
+						{
+							found	= select( bullpen[b]['selector'] );
+							f		= found.length;
+							while ( f-- )
+							{
+								if ( found[f] == children[c] )
+								{
+									grid_items.push({
+										element: children[c],
+										details: bullpen[b]
+									});
+									bullpen.splice(b,1);
+									break;
+								}
+							}
+						}
+					}
+					console.log(grid_items);
+					GridTest.verifyLayout( els[eLen], properties );
+				}
+			}
+			
+			// trigger the actual function and re-define the callback
+			gridify( selector, properties, media, specificity );
+			return gridify;
+		}
 	
-	function gridify()
-	{
-		
-		
-	}
+	);
 	
 	function WidthAndHeight()
 	{
-		this.width	= null;
-		this.height = null;
+		this.width	= NULL;
+		this.height = NULL;
 	}
 	
 	function CSSValueAndUnit()
 	{
-		this.value	= null;
-		this.unit	= null;
+		this.value	= NULL;
+		this.unit	= NULL;
 	}
 	
-	function Grid(element)
+	function Grid( element, properties )
 	{
 		this.gridElement				= element;
+		this.properties					= properties;
 		this.blockProgression			= GridTest.layoutVerifier.blockProgressionStringToEnum(
-											element.currentStyle.getPropertyValue(BLOCKPROGRESSION)
+											getCSSValue( element, BLOCKPROGRESSION )
 										  );
-		this.availableSpaceForColumns	= null;
-		this.availableSpaceForRows		= null;
-		this.items						= null;
-		this.useAlternateFractionalSizingForColumns = false;
-		this.useAlternateFractionalSizingForRows	= false;
+		this.availableSpaceForColumns	= NULL;
+		this.availableSpaceForRows		= NULL;
+		this.items						= NULL;
+		this.useAlternateFractionalSizingForColumns = FALSE;
+		this.useAlternateFractionalSizingForRows	= FALSE;
 		this.columnTrackManager			= new TrackManager();
 		this.rowTrackManager			= new TrackManager();
 	}
 	
 	function Track()
 	{
-		this.number				= null;
-		this.size				= null;
-		this.sizingType			= null;
+		this.number				= NULL;
+		this.size				= NULL;
+		this.sizingType			= NULL;
 		this.items				= [];
-		this.measure			= null;
-		this.minMeasure			= null;
-		this.maxMeasure			= null;
-		this.contentSizedTrack	= false;
-		this.implicit			= false;
+		this.measure			= NULL;
+		this.minMeasure			= NULL;
+		this.maxMeasure			= NULL;
+		this.contentSizedTrack	= FALSE;
+		this.implicit			= FALSE;
 	}
 
 	function ImplicitTrackRange()
 	{
-		this.firstNumber	= null;
-		this.span			= null;
+		this.firstNumber	= NULL;
+		this.span			= NULL;
 		this.size			= gridTrackValueEnum.auto;
 		this.sizingType		= sizingTypeEnum.keyword;
 		this.items			= [];
-		this.measure		= null;
+		this.measure		= NULL;
 	}
 	
 	function Item()
 	{
-		this.itemElement		= null;
-		this.position			= null;
+		this.itemElement		= NULL;
+		this.position			= NULL;
 		this.column				= 1;
 		this.columnSpan			= 1;
 		this.columnAlign		= gridAlignEnum.stretch;
@@ -168,63 +314,36 @@ Note:						If you change or improve on this script, please let us know by
 		this.rowSpan			= 1;
 		this.rowAlign			= gridAlignEnum.stretch;
 		// Used width calculated during column track size resolution.
-		this.usedWidthMeasure	= null;
-		this.maxWidthMeasure	= null;
-		this.maxHeightMeasure	= null;
-		this.shrinkToFitSize	= null; // physical dimensions
+		this.usedWidthMeasure	= NULL;
+		this.maxWidthMeasure	= NULL;
+		this.maxHeightMeasure	= NULL;
+		this.shrinkToFitSize	= NULL; // physical dimensions
 		this.verified = {
-			columnBreadth:	false,
-			rowBreadth:		false,
-			columnPosition: false,
-			rowPosition:	false
+			columnBreadth:	FALSE,
+			rowBreadth:		FALSE,
+			columnPosition: FALSE,
+			rowPosition:	FALSE
 		};
 	}
 
-	function GridTest()
-	{
-		var
-		intrinsicSizeCalculatorElement			= null,
-		intrinsicSizeCalculatorElementParent	= null,
-		calculatorOperationEnum					= {
-			minWidth: {},
-			maxWidth: {},
-			minHeight: {},
-			maxHeight: {},
-			shrinkToFit: {}
-		};
+	var GridTest = {
 		
-		function verifyLayout ( gridElement, gridColumnsDefinition, gridRowsDefinition )
+		verifyLayout: function ( element, properties )
 		{
-			var gridObject = new Grid(gridElement);
-			return LayoutVerifier.verifyLayout(gridObject, gridColumnsDefinition, gridRowsDefinition);
-		}
-		this.verifyLayout = verifyLayout;
-		
-		this.verifyLayoutByElementID = function ( gridElementID, gridColumnsDefinition, gridRowsDefinition )
-		{
-			return verifyLayout(document.getElementById(gridElementID), gridColumnsDefinition, gridRowsDefinition);
-		};
-		
-		this.isGridElement = function ( element )
-		{
-			var display = window.getComputedStyle(element, null).display;
-			return ( display === GRID ||
-					 display === INLINEGRID );
-		};
-
-		this.shouldSwapWidthAndHeight = function ( blockProgression )
+			var gridObject = new Grid( element, properties );
+			return this.layoutVerifier.verifyLayout( gridObject );
+		},
+		shouldSwapWidthAndHeight: function ( blockProgression )
 		{
 			return ( blockProgression === blockProgressionEnum.lr ||
 					 blockProgression === blockProgressionEnum.rl );
-		};
-
-		this.trackIsFractionSized = function ( trackToCheck )
+		},
+		trackIsFractionSized: function ( trackToCheck )
 		{
 			return ( trackToCheck.sizingType === sizingTypeEnum.valueAndUnit &&
 					 trackToCheck.size.unit === "fr" );
-		};
-
-		this.boxSizeCalculator = {
+		},
+		boxSizeCalculator: {
 			calcMarginBoxWidth: function (usedStyle)
 			{
 				var
@@ -363,15 +482,14 @@ Note:						If you change or improve on this script, please let us know by
 								 );
 				return boxHeight;
 			}
-		};
-		
-		this.intrinsicSizeCalculator = {
+		},
+		intrinsicSizeCalculator: {
 			zeroLength:		{ cssText: "0px" },
 			infiniteLength: { cssText: "1000000px" },
 							/* last 2 params only required for shrink-to-fit calculation */
 			prepare:		function ( element, calculatorOperation, containerWidth, containerHeight)
 			{
-				if ( intrinsicSizeCalculatorElement === null )
+				if ( intrinsicSizeCalculatorElement === NULL )
 				{
 					 intrinsicSizeCalculatorElement = document.createElement("div");
 					 intrinsicSizeCalculatorElement.id = "intrinsicSizeCalculator";
@@ -383,7 +501,7 @@ Note:						If you change or improve on this script, please let us know by
 				gridElementUsedStyle;
 				
 				if ( typeof containerWidth !== "undefined" &&
-					 containerWidth !== null )
+					 containerWidth !== NULL )
 				{
 					cssText += "width: " + containerWidth.getPixelValueString() + "px";
 				}
@@ -405,7 +523,7 @@ Note:						If you change or improve on this script, please let us know by
 					}
 				}
 				if ( typeof containerHeight !== "undefined" &&
-					 containerHeight !== null )
+					 containerHeight !== NULL )
 				{
 					cssText += "; height: " + containerHeight.getPixelValueString() + "px";
 				}
@@ -427,11 +545,6 @@ Note:						If you change or improve on this script, please let us know by
 					}
 				}
 				
-				if ( ! GridTest.isGridElement(gridElement) )
-				{
-					console.log("Element is not a child of a grid");
-				}
-			
 				/* Insert our calculator at the same level as the grid to ensure child selectors work as well as we can reasonably achieve.
 				 * Special case: the grid is the body element.
 				 * In that case, put the calculator under the grid anyway;
@@ -443,7 +556,7 @@ Note:						If you change or improve on this script, please let us know by
 				// TODO: add additional properties if new test content requires it.
 				if ( intrinsicSizeCalculatorElementParent !== gridElement )
 				{
-					gridElementUsedStyle = window.getComputedStyle( gridElement, null );
+					gridElementUsedStyle = WINDOW.getComputedStyle( gridElement, NULL );
 					cssText += "; font-family: " + gridElementUsedStyle.getPropertyValue("font-family")
 							+ "; font-size: " + gridElementUsedStyle.getPropertyValue("font-size")
 							+ "; font-size-adjust: " + gridElementUsedStyle.getPropertyValue("font-size-adjust")
@@ -463,7 +576,7 @@ Note:						If you change or improve on this script, please let us know by
 			},
 			cloneAndAppendToCalculator: function(element)
 			{
-				var clone = element.cloneNode(true);
+				var clone = element.cloneNode(TRUE);
 				// Float it so that the box won't constrain itself to the parent's size.
 				clone.style.cssText = clone.style.cssText + "; float: left";
 				intrinsicSizeCalculatorElement.appendChild(clone);
@@ -475,7 +588,7 @@ Note:						If you change or improve on this script, please let us know by
 			
 				var
 				clone	= this.cloneAndAppendToCalculator(element),
-				width	= GridTest.boxSizeCalculator.calcMarginBoxWidth( window.getComputedStyle(clone, null) );
+				width	= GridTest.boxSizeCalculator.calcMarginBoxWidth( WINDOW.getComputedStyle(clone, NULL) );
 			
 				intrinsicSizeCalculatorElement.removeChild(clone);
 				this.unprepare();
@@ -488,7 +601,7 @@ Note:						If you change or improve on this script, please let us know by
 			
 				var
 				clone	= this.cloneAndAppendToCalculator(element),
-				width	= GridTest.boxSizeCalculator.calcMarginBoxWidth( window.getComputedStyle(clone, null) );
+				width	= GridTest.boxSizeCalculator.calcMarginBoxWidth( WINDOW.getComputedStyle(clone, NULL) );
 			
 				intrinsicSizeCalculatorElement.removeChild(clone);
 				this.unprepare();
@@ -498,7 +611,7 @@ Note:						If you change or improve on this script, please let us know by
 			calcMinHeight: function (element, usedWidth)
 			{
 				if ( typeof usedWidth === "undefined" ||
-					 usedWidth === null )
+					 usedWidth === NULL )
 				{
 					console.log("calcMinHeight: no usedWidth specified");
 				}
@@ -507,7 +620,7 @@ Note:						If you change or improve on this script, please let us know by
 			
 				var
 				clone	= this.cloneAndAppendToCalculator(element),
-				height	= GridTest.boxSizeCalculator.calcMarginBoxHeight( window.getComputedStyle(clone, null) );
+				height	= GridTest.boxSizeCalculator.calcMarginBoxHeight( WINDOW.getComputedStyle(clone, NULL) );
 			
 				intrinsicSizeCalculatorElement.removeChild(clone);
 				this.unprepare();
@@ -517,7 +630,7 @@ Note:						If you change or improve on this script, please let us know by
 			calcMaxHeight: function (element, usedWidth)
 			{
 				if ( typeof usedWidth === "undefined" ||
-					 usedWidth === null )
+					 usedWidth === NULL )
 				{
 					console.log("calcMaxHeight: no usedWidth specified");
 				}
@@ -526,7 +639,7 @@ Note:						If you change or improve on this script, please let us know by
 			
 				var
 				clone	= this.cloneAndAppendToCalculator(element),
-				height	= GridTest.boxSizeCalculator.calcMarginBoxHeight( window.getComputedStyle(clone, null) );
+				height	= GridTest.boxSizeCalculator.calcMarginBoxHeight( WINDOW.getComputedStyle(clone, NULL) );
 			
 				intrinsicSizeCalculatorElement.removeChild(clone);
 				this.unprepare();
@@ -536,11 +649,11 @@ Note:						If you change or improve on this script, please let us know by
 			calcShrinkToFitWidthAndHeight: function ( element, containerWidth, containerHeight, forcedMarginBoxWidth, forcedMarginBoxHeight )
 			{
 				// If we're forcing a specific size on the grid item, adjust the calculator's container size to accomodate it.
-				if ( forcedMarginBoxWidth !== null )
+				if ( forcedMarginBoxWidth !== NULL )
 				{
 					containerWidth = forcedMarginBoxWidth;
 				}
-				if ( forcedMarginBoxHeight !== null )
+				if ( forcedMarginBoxHeight !== NULL )
 				{
 					containerHeight = forcedMarginBoxHeight;
 				}
@@ -549,7 +662,7 @@ Note:						If you change or improve on this script, please let us know by
 			
 				var
 				clone						= this.cloneAndAppendToCalculator(element),
-				cloneUsedStyle				= window.getComputedStyle(clone, null),
+				cloneUsedStyle				= WINDOW.getComputedStyle(clone, NULL),
 				shrinkToFitWidthAndHeight	= new WidthAndHeight(),
 				forcedWidth, forcedHeight;
 			
@@ -559,13 +672,13 @@ Note:						If you change or improve on this script, please let us know by
 				 * want the original values to work correctly. Convert the specified 
 				 * forced length to the appropriate length for the width/height property.
 				 **/
-				if ( forcedMarginBoxWidth !== null )
+				if ( forcedMarginBoxWidth !== NULL )
 				{
 					forcedWidth = GridTest.boxSizeCalculator.calcBoxWidthFromMarginBoxWidth(cloneUsedStyle, forcedMarginBoxWidth);
 					clone.style.cssText +=	"min-width: " + forcedWidth.getPixelValueString() + "px; max-width: " +
 											forcedWidth.getPixelValueString() + "px";
 				}
-				if ( forcedMarginBoxHeight !== null )
+				if ( forcedMarginBoxHeight !== NULL )
 				{
 					forcedHeight = GridTest.boxSizeCalculator.calcBoxHeightFromMarginBoxHeight(cloneUsedStyle, forcedMarginBoxHeight);
 					clone.style.cssText +=	"min-height: " + forcedHeight.getPixelValueString() + "; max-height: " +
@@ -579,33 +692,18 @@ Note:						If you change or improve on this script, please let us know by
 			
 				return shrinkToFitWidthAndHeight;
 			}
-		};
-
-		this.layoutVerifier = {
-			error		: false,
-			verifyLayout: function ( gridObject, gridColumnsDefinition, gridRowsDefinition )
+		},
+		layoutVerifier: {
+			error		: FALSE,
+			verifyLayout: function ( gridObject )
 			{
 				var
-				gridElement = gridObject.gridElement,
-				gridUsedStyle;
-				if ( gridElement === null )
-				{
-					console.log("Grid element is null");
-					this.error = true;
-					return false;
-				}
-				gridUsedStyle = window.getComputedStyle(gridElement, null);
-				if ( ! GridTest.isGridElement(gridElement) )
-				{
-					console.log("invalid display value");
-					this.error = true;
-					return false;
-				}
-
+				gridElement = gridObject.gridElement;
+				
 				// Get the available space for the grid since it is required
 				// for determining track sizes for auto/fit-content/minmax 
 				// and fractional tracks.
-				this.determineGridAvailableSpace(gridObject);
+				this.determineGridAvailableSpace( gridObject );
 
 				console.log("Grid element content available space: columns = " + 
 							gridObject.availableSpaceForColumns.getPixelValueString() + "; rows = " +
@@ -647,12 +745,13 @@ Note:						If you change or improve on this script, please let us know by
 			 * 3. Swapping back the real grid element
 			 * Yes, this depends on the dummy block|inline-block sizing to work correctly.
 			 **/
-			determineGridAvailableSpace: function (gridObject)
+			determineGridAvailableSpace: function ( gridObject )
 			{
 				var
 				gridElement			= gridObject.gridElement,
+				gridProperties		= gridObject.properties,
 				gridElementParent	= gridElement.parentNode,
-				usedStyle			= window.getComputedStyle(gridElement, null),
+				
 				isInlineGrid, currentStyle,
 				marginLeft, marginRight, paddingLeft, paddingRight, borderLeftWidth, borderRightWidth,
 				marginTop, marginBottom, paddingTop, paddingBottom, borderTopWidth, borderBottomWidth,
@@ -663,12 +762,13 @@ Note:						If you change or improve on this script, please let us know by
 
 				// Get each individual margin, border, and padding value for
 				// using with calc() when specifying the width/height of the dummy element.
+				console.log(gridProperties);
 				if ( typeof gridElement.currentStyle !== "undefined" )
 				{
 					currentStyle = gridElement.currentStyle;
 					
 					// Use the IE-only interface for getting computed (not used) styles via the DOM.
-					isInlineGrid = currentStyle.display === INLINEGRID ? true : false;
+					isInlineGrid = currentStyle.display === INLINEGRID ? TRUE : FALSE;
 
 					marginLeft = currentStyle.marginLeft;
 					if ( marginLeft === "auto" )
@@ -722,12 +822,12 @@ Note:						If you change or improve on this script, please let us know by
 				if ( currentStyle.width === "auto" &&
 				 	 ( isInlineGrid || currentStyle['float'] !== "none" ) )
 				{
-					gridObject.useAlternateFractionalSizingForColumns = true;
+					gridObject.useAlternateFractionalSizingForColumns = TRUE;
 					console.log("Using alternate fractional sizing for columns");
 				}
 				if ( currentStyle.height === "auto" )
 				{
-					gridObject.useAlternateFractionalSizingForRows = true;
+					gridObject.useAlternateFractionalSizingForRows = TRUE;
 					console.log("Using alternate fractional sizing for rows");
 				}
 
@@ -744,12 +844,12 @@ Note:						If you change or improve on this script, please let us know by
 															: this.buildCalcString(
 																"100%", "-", marginLeft, borderLeftWidth, 
 																paddingLeft, paddingRight, borderRightWidth, marginRight
-															  );
+																);
 				heightToUse = currentStyle.width !== "auto" ? currentStyle.height
 															: this.buildCalcString(
 																"100%", "-", marginTop, borderTopWidth,
 																paddingTop, paddingBottom, borderBottomWidth, marginBottom
-															  );
+																);
 
 				marginToUse = currentStyle.margin;
 				if ( marginToUse === "auto" )
@@ -792,7 +892,7 @@ Note:						If you change or improve on this script, please let us know by
 				// Remove the real grid element.
 				removedElement = gridElementParent.removeChild(gridElement);
 
-				dummyUsedStyle = window.getComputedStyle(dummy, null);
+				dummyUsedStyle = WINDOW.getComputedStyle(dummy, NULL);
 
 				// The dummy item should never add scrollbars if the grid element didn't.
 				widthAdjustment		= scrollWidth - this.verticalScrollbarWidth();
@@ -848,9 +948,9 @@ Note:						If you change or improve on this script, please let us know by
 				curItemUsedStyle;
 				for (var i = 0; i < items.length; i++)
 				{
-					if ( items[i].position === null )
+					if ( items[i].position === NULL )
 					{
-						curItemUsedStyle	= window.getComputedStyle(items[i].itemElement, null);
+						curItemUsedStyle	= WINDOW.getComputedStyle(items[i].itemElement, NULL);
 						items[i].position	= this.positionStringToEnum(curItemUsedStyle.getPropertyValue("position"));
 					}
 				}
@@ -907,12 +1007,12 @@ Note:						If you change or improve on this script, please let us know by
 				dummyItem.style.cssText = cssText;
 
 				dummyItem				= gridElement.appendChild(dummyItem);
-				dummyUsedStyle			= window.getComputedStyle(dummyItem, null);
-				gridElementUsedStyle	= window.getComputedStyle(gridElement, null);
+				dummyUsedStyle			= WINDOW.getComputedStyle(dummyItem, NULL);
+				gridElementUsedStyle	= WINDOW.getComputedStyle(gridElement, NULL);
 
 				blockProgression	= GridTest.layoutVerifier.blockProgressionStringToEnum(
 										gridElementUsedStyle.getPropertyValue( BLOCKPROGRESSION )
-									  );
+										);
 
 				trackMeasure	= this.usePhysicalWidths(blockProgression, computingColumns)
 								? layoutMeasure.measureFromStyleProperty(dummyUsedStyle, "width")
@@ -923,12 +1023,12 @@ Note:						If you change or improve on this script, please let us know by
 			},
 			verifyGridItemSizes: function (gridObject)
 			{
-				this.verifyGridItemLengths(gridObject, true);
-				this.verifyGridItemLengths(gridObject, false);
+				this.verifyGridItemLengths(gridObject, TRUE);
+				this.verifyGridItemLengths(gridObject, FALSE);
 			},
 			verifyGridItemPositions: function (gridObject) {
-				this.verifyGridItemTrackPositions(gridObject, true);
-				this.verifyGridItemTrackPositions(gridObject, false);
+				this.verifyGridItemTrackPositions(gridObject, TRUE);
+				this.verifyGridItemTrackPositions(gridObject, FALSE);
 			},
 			calculateGridItemShrinkToFitSizes: function (gridObject)
 			{
@@ -938,20 +1038,20 @@ Note:						If you change or improve on this script, please let us know by
 				items				= gridObject.items,
 				i, iLen 			= items.length,
 				curItem, columnsBreadth, rowsBreadth,
-				forcedWidth = null, forcedHeight = null;
+				forcedWidth = NULL, forcedHeight = NULL;
 
 				for ( i=0; i < iLen; i++ )
 				{
 					curItem = items[i];
-					if ( curItem.shrinkToFitSize === null )
+					if ( curItem.shrinkToFitSize === NULL )
 					{
 						// Percentage resolution is based on the size of the cell for the grid item.
 						columnsBreadth	= this.getSumOfSpannedTrackMeasures(
 											gridObject.columnTrackManager, curItem.column, curItem.columnSpan
-										  );
+											);
 						rowsBreadth		= this.getSumOfSpannedTrackMeasures(
 											gridObject.rowTrackManager, curItem.row, curItem.rowSpan
-										  );
+											);
 
 						// Force a stretch if requested.
 						if ( curItem.position === positionEnum['static'] ||
@@ -982,22 +1082,22 @@ Note:						If you change or improve on this script, please let us know by
 						}
 
 						// Only calculate an intrinsic size if we're not forcing both width and height.
-						if ( forcedWidth === null ||
-							 forcedHeight === null )
+						if ( forcedWidth === NULL ||
+							 forcedHeight === NULL )
 						{
 							curItem.shrinkToFitSize	= GridTest.intrinsicSizeCalculator.calcShrinkToFitWidthAndHeight(
 														curItem.itemElement, columnsBreadth, rowsBreadth, forcedWidth, forcedHeight
-													  );
+														);
 						}
 						else
 						{
 							curItem.shrinkToFitSize = new WidthAndHeight();
 						}
-						if ( forcedWidth !== null )
+						if ( forcedWidth !== NULL )
 						{
 							curItem.shrinkToFitSize.width = forcedWidth;
 						}
-						if ( forcedHeight !== null )
+						if ( forcedHeight !== NULL )
 						{
 							curItem.shrinkToFitSize.height = forcedHeight;
 						}
@@ -1008,10 +1108,10 @@ Note:						If you change or improve on this script, please let us know by
 			{
 				if ( ( ( blockProgression === blockProgressionEnum.tb ||
 						 blockProgression === blockProgressionEnum.bt ) &&
-					   verifyingColumnBreadths === true ) ||
+						 verifyingColumnBreadths === TRUE ) ||
 					 ( ( blockProgression === blockProgressionEnum.lr ||
 						 blockProgression === blockProgressionEnum.rl ) &&
-					   verifyingColumnBreadths === false ) )
+						 verifyingColumnBreadths === FALSE ) )
 				{
 					return GridTest.boxSizeCalculator.calcMarginBoxWidth(itemUsedStyle);
 				}
@@ -1022,20 +1122,20 @@ Note:						If you change or improve on this script, please let us know by
 			},
 			usePhysicalWidths: function (blockProgression, verifyingColumns)
 			{
-				var usePhysicalWidths = false;
+				var usePhysicalWidths = FALSE;
 				if ( ( ( blockProgression === blockProgressionEnum.tb ||
 						 blockProgression === blockProgressionEnum.bt ) &&
-					   verifyingColumns === true ) ||
+						 verifyingColumns === TRUE ) ||
 					 ( ( blockProgression === blockProgressionEnum.lr ||
 						 blockProgression === blockProgressionEnum.rl ) &&
-					   verifyingColumns === false ) )
+						 verifyingColumns === FALSE ) )
 				{
-					usePhysicalWidths = true;
+					usePhysicalWidths = TRUE;
 				}
 				return usePhysicalWidths;
 			},
-			// verifyingColumnBreadths == true => verify length of items in the direction of columns 
-			// verifyingColumnBreadths == false => verify length of items in the direction of rows 
+			// verifyingColumnBreadths == TRUE => verify length of items in the direction of columns 
+			// verifyingColumnBreadths == FALSE => verify length of items in the direction of rows 
 			verifyGridItemLengths: function (gridObject, verifyingColumnBreadths)
 			{
 				var
@@ -1055,7 +1155,7 @@ Note:						If you change or improve on this script, please let us know by
 					console.log("Column breadths are heights due to block-progression value '" + blockProgression.keyword + "'");
 				}
 				else if ( ! verifyingColumnBreadths &&
-						  verifyingPhysicalWidths )
+							verifyingPhysicalWidths )
 				{
 					console.log("Row breadths are widths due to block-progression value '" + blockProgression.keyword + "'");
 				}
@@ -1063,9 +1163,9 @@ Note:						If you change or improve on this script, please let us know by
 				for ( i = 0; i < iLen; i++ )
 				{
 					curItem					= items[i];
-					curGridItemUsedStyle	= window.getComputedStyle(curItem.itemElement, null);
+					curGridItemUsedStyle	= WINDOW.getComputedStyle(curItem.itemElement, NULL);
 
-					if ( ( verifyingColumnBreadths ? curItem.verified.columnBreadth : curItem.verified.rowBreadth ) !== true )
+					if ( ( verifyingColumnBreadths ? curItem.verified.columnBreadth : curItem.verified.rowBreadth ) !== TRUE )
 					{
 						trackNum		= verifyingColumnBreadths ? curItem.column : curItem.row;
 						alignType		= verifyingColumnBreadths ? curItem.columnAlign : curItem.rowAlign;
@@ -1082,9 +1182,9 @@ Note:						If you change or improve on this script, please let us know by
 						// Check the offsetWidth/offsetHeight to make sure it agrees.
 						offsetLength	= verifyingPhysicalWidths ? curItem.itemElement.offsetWidth : curItem.itemElement.offsetHeight;
 						offsetMeasure	= layoutMeasure.measureFromPx(offsetLength);
-						if ( actualMeasure.getMeasureRoundedToWholePixel().equals(offsetMeasure) !== true )
+						if ( actualMeasure.getMeasureRoundedToWholePixel().equals(offsetMeasure) !== TRUE )
 						{
-							this.error = true;
+							this.error = TRUE;
 							console.log( itemId + (verifyingColumnBreadths ? "column" : "row") + " " + 
 										 trackNum + ", item " + i + ": " +
 										 "offset length doesn't agree with calculated margin box length (" +
@@ -1097,7 +1197,7 @@ Note:						If you change or improve on this script, please let us know by
 						if ( curItem.position === positionEnum.absolute )
 						{
 							// Use shrink-to-fit sizes.
-							if ( curItem.shrinkToFitSize === null )
+							if ( curItem.shrinkToFitSize === NULL )
 							{
 								console.log("Current item's shrink to fit size has not been calculated");
 							}
@@ -1117,7 +1217,7 @@ Note:						If you change or improve on this script, please let us know by
 								case gridAlignEnum.end:
 								case gridAlignEnum.center:
 									// Item uses its shrink-to-fit size.
-									if (curItem.shrinkToFitSize === null)
+									if (curItem.shrinkToFitSize === NULL)
 									{
 										console.log("Current item's shrink to fit size has not been calculated");
 									}
@@ -1130,7 +1230,7 @@ Note:						If you change or improve on this script, please let us know by
 							}
 						}
 
-						if ( expectedMeasure.equals(actualMeasure) !== true )
+						if ( expectedMeasure.equals(actualMeasure) !== TRUE )
 						{
 							// If the agent is more precise than whole pixels, and we are off 
 							// by just one layout pixel (1/100th of a pixel for IE), it's close enough.
@@ -1143,7 +1243,7 @@ Note:						If you change or improve on this script, please let us know by
 							}
 							else
 							{
-								this.error = true;
+								this.error = TRUE;
 								console.log( itemId + (verifyingColumnBreadths ? "column" : "row") + " " + trackNum + ": " +
 											 "sizing check failed (alignment: " + alignType.keyword + "; expected: " +
 											 expectedMeasure.getPixelValueString() + "; actual: " + 
@@ -1159,11 +1259,11 @@ Note:						If you change or improve on this script, please let us know by
 
 						if ( verifyingColumnBreadths )
 						{
-							curItem.verified.columnBreadth = true;
+							curItem.verified.columnBreadth = TRUE;
 						}
 						else
 						{
-							curItem.verified.rowBreadth = true;
+							curItem.verified.rowBreadth = TRUE;
 						}
 					}
 					else
@@ -1179,7 +1279,7 @@ Note:						If you change or improve on this script, please let us know by
 				curTrack	= trackIter.next(),
 				trackRange, trackInfoString;
 
-				while ( curTrack !== null )
+				while ( curTrack !== NULL )
 				{
 					if ( curTrack instanceof implicitTrackRange )
 					{
@@ -1205,33 +1305,33 @@ Note:						If you change or improve on this script, please let us know by
 			horizontalOffsetsAreReversed: function ( gridUsedStyle )
 			{
 				var
-				reverseDirection	= false,
+				reverseDirection	= FALSE,
 				directionIsLTR		= gridUsedStyle.getPropertyValue("direction") === "ltr",
 				blockProgression	= GridTest.layoutVerifier.blockProgressionStringToEnum(
 										gridUsedStyle.getPropertyValue(BLOCKPROGRESSION)
-									  );
+										);
 				if ( blockProgression === blockProgressionEnum.rl ||
 					 ( ! directionIsLTR &&
 						blockProgression !== blockProgressionEnum.lr ) )
 				{
-					reverseDirection = true;
+					reverseDirection = TRUE;
 				}
 				return reverseDirection;
 			},
 			verticalOffsetsAreReversed: function ( gridUsedStyle )
 			{
 				var
-				reverseDirection	= false,
+				reverseDirection	= FALSE,
 				directionIsLTR		= gridUsedStyle.getPropertyValue("direction") === "ltr",
 				blockProgression	= GridTest.layoutVerifier.blockProgressionStringToEnum(
 										gridUsedStyle.getPropertyValue(BLOCKPROGRESSION)
-									  );
+										);
 				if ( blockProgression === blockProgressionEnum.bt ||
 					 ( ! directionIsLTR &&
-					   ( blockProgression === blockProgressionEnum.lr ||
+						 ( blockProgression === blockProgressionEnum.lr ||
 						 blockProgression === blockProgressionEnum.rl ) ) )
 				{
-					reverseDirection = true;
+					reverseDirection = TRUE;
 				}
 				return reverseDirection;
 			},
@@ -1242,8 +1342,8 @@ Note:						If you change or improve on this script, please let us know by
 			{
 				var
 				itemElement		= item.itemElement,
-				itemUsedStyle	= window.getComputedStyle(itemElement, null),
-				parentUsedStyle	= window.getComputedStyle(itemElement.parentNode, null),
+				itemUsedStyle	= WINDOW.getComputedStyle(itemElement, NULL),
+				parentUsedStyle	= WINDOW.getComputedStyle(itemElement.parentNode, NULL),
 
 				// Map physical offset to logical offset if necessary.
 				reverseDirection = this.horizontalOffsetsAreReversed(parentUsedStyle),
@@ -1264,7 +1364,7 @@ Note:						If you change or improve on this script, please let us know by
 					gridStartingContentEdgeOffset = layoutMeasure.measureFromStyleProperty(parentUsedStyle, "padding-left");
 				}
 
-				if ( reverseDirection === true )
+				if ( reverseDirection === TRUE )
 				{
 					// Reversing direction; the starting edge is on the other side.
 					gridStartingContentEdgeOffset = gridStartingContentEdgeOffset
@@ -1275,13 +1375,13 @@ Note:						If you change or improve on this script, please let us know by
 				itemStartingMarginEdgeOffset	= layoutMeasure
 													.measureFromPx(itemElement.offsetLeft)
 													.subtract(itemMarginLeft);
-				if ( reverseDirection === true )
+				if ( reverseDirection === TRUE )
 				{
 					// Reversing direction; the starting edge is on the other side.
 					marginBoxWidth					= GridTest.boxSizeCalculator.calcMarginBoxWidth(itemUsedStyle);
 					itemStartingMarginEdgeOffset	= itemStartingMarginEdgeOffset.add(marginBoxWidth);
 				}
-				if (reverseDirection === false)
+				if (reverseDirection === FALSE)
 				{
 					offsetFromGridStartingContentEdge = itemStartingMarginEdgeOffset
 															.subtract(gridStartingContentEdgeOffset);
@@ -1297,8 +1397,8 @@ Note:						If you change or improve on this script, please let us know by
 			{
 				var
 				itemElement		= item.itemElement,
-				itemUsedStyle	= window.getComputedStyle(itemElement, null),
-				parentUsedStyle	= window.getComputedStyle(itemElement.parentNode, null),
+				itemUsedStyle	= WINDOW.getComputedStyle(itemElement, NULL),
+				parentUsedStyle	= WINDOW.getComputedStyle(itemElement.parentNode, NULL),
 
 				// Map physical offset to logical offset if necessary.
 				reverseDirection = this.verticalOffsetsAreReversed(parentUsedStyle),
@@ -1319,7 +1419,7 @@ Note:						If you change or improve on this script, please let us know by
 					gridStartingContentEdgeOffset = layoutMeasure.measureFromStyleProperty(parentUsedStyle, "padding-top");
 				}
 
-				if ( reverseDirection === true )
+				if ( reverseDirection === TRUE )
 				{
 					// Reversing direction; the starting edge is on the other side.
 					gridStartingContentEdgeOffset = gridStartingContentEdgeOffset
@@ -1329,13 +1429,13 @@ Note:						If you change or improve on this script, please let us know by
 				itemMarginTop					= layoutMeasure.measureFromStyleProperty(itemUsedStyle, "margin-top");
 				itemStartingMarginEdgeOffset	= layoutMeasure.measureFromPx(itemElement.offsetTop).subtract(itemMarginTop);
 
-				if ( reverseDirection === true )
+				if ( reverseDirection === TRUE )
 				{
 					// Reversing direction; the starting edge is on the other side.
 					marginBoxHeight					= GridTest.boxSizeCalculator.calcMarginBoxHeight(itemUsedStyle);
 					itemStartingMarginEdgeOffset	= itemStartingMarginEdgeOffset.add(marginBoxHeight);
 				}
-				if (reverseDirection === false)
+				if (reverseDirection === FALSE)
 				{
 					offsetFromGridStartingContentEdge = itemStartingMarginEdgeOffset.subtract(gridStartingContentEdgeOffset);
 				}
@@ -1353,8 +1453,8 @@ Note:						If you change or improve on this script, please let us know by
 				itemElement 			= item.itemElement,
 				gridElement 			= itemElement.parentNode,
 				containingElement		= this.getContainingBlockElementForAbsolutePositionedGridItems(itemElement.parentNode),
-				itemUsedStyle			= window.getComputedStyle(itemElement),
-				gridElementUsedStyle	= window.getComputedStyle(gridElement, null),
+				itemUsedStyle			= WINDOW.getComputedStyle(itemElement),
+				gridElementUsedStyle	= WINDOW.getComputedStyle(gridElement, NULL),
 				itemOffset				= layoutMeasure.measureFromPx(itemElement.offsetLeft);
 
 				if (containingElement !== itemElement.offsetParent)
@@ -1390,8 +1490,8 @@ Note:						If you change or improve on this script, please let us know by
 				itemElement				= item.itemElement,
 				gridElement				= item.itemElement.parentNode,
 				containingElement		= this.getContainingBlockElementForAbsolutePositionedGridItems(itemElement.parentNode),
-				itemUsedStyle			= window.getComputedStyle(itemElement),
-				gridElementUsedStyle	= window.getComputedStyle(gridElement, null),
+				itemUsedStyle			= WINDOW.getComputedStyle(itemElement),
+				gridElementUsedStyle	= WINDOW.getComputedStyle(gridElement, NULL),
 				itemOffset				= layoutMeasure.measureFromPx(itemElement.offsetTop);
 				
 				if ( containingElement !== itemElement.offsetParent )
@@ -1431,7 +1531,7 @@ Note:						If you change or improve on this script, please let us know by
 				//		nearest ancestor with a 'position' of 'absolute', 'relative' or 'fixed', ...
 				// TODO: handle rtl
 				do {
-					curUsedStyle = window.getComputedStyle(curElement, null);
+					curUsedStyle = WINDOW.getComputedStyle(curElement, NULL);
 					curPosition = curUsedStyle.getPropertyValue("position");
 
 					if (curPosition === "absolute" || curPosition === "relative" || curPosition === "fixed") {
@@ -1453,11 +1553,11 @@ Note:						If you change or improve on this script, please let us know by
 				//	 3. If the element has 'position: fixed', the containing block is established by the
 				//		viewport in the case of continuous media or the page area in the case of paged media.
 				//
-				// All browsers except for Firefox return a null offsetParent for fixed positioned elements.
-				return ( vendorPrefix === "moz" ) ? document.body : null;
+				// All browsers except for Firefox return a NULL offsetParent for fixed positioned elements.
+				return ( vendorPrefix === "moz" ) ? document.body : NULL;
 			},
-			// verifyingColumnPositions == true => verify positions of items along the columns 
-			// verifyingColumnPositions == false => verify positions of items along the rows 
+			// verifyingColumnPositions == TRUE => verify positions of items along the columns 
+			// verifyingColumnPositions == FALSE => verify positions of items along the rows 
 			verifyGridItemTrackPositions: function (gridObject, verifyingColumnPositions)
 			{
 				var
@@ -1466,18 +1566,18 @@ Note:						If you change or improve on this script, please let us know by
 				verificationWord			= verifyingColumnPositions ? "column" : "row",
 				curTrackStartPosition		= layoutMeasure.zero(),
 				curTrackEndPosition			= layoutMeasure.zero(),
-				inFirstTrack				= true,
-				lastTrackWasContentSized	= false,
+				inFirstTrack				= TRUE,
+				lastTrackWasContentSized	= FALSE,
 				trackIter					= trackManager.getIterator(),
 				curTrack					= trackIter.next(),
 				verifyingHorizontalOffsets	= this.usePhysicalWidths(gridObject.blockProgression, verifyingColumnPositions),
-				gridUsedStyle				= window.getComputedStyle(gridObject.gridElement, null),
+				gridUsedStyle				= WINDOW.getComputedStyle(gridObject.gridElement, NULL),
 				i, len, curItem, curGridItemUsedStyle, alignType,
 				actualMeasure, firstTrack, trackSpan, spannedTrackMeasure,
 				itemOffset, itemId, trackNum, expectedPosition,
 				expectedPositionRounded, itemOffsetRounded;
 
-				while ( curTrack !== null )
+				while ( curTrack !== NULL )
 				{
 					// The start of this track is right after where the previous one ends.
 					if ( ! inFirstTrack )
@@ -1485,7 +1585,7 @@ Note:						If you change or improve on this script, please let us know by
 						curTrackStartPosition = curTrackEndPosition.add(new LayoutMeasure(1));
 					}
 					else {
-						inFirstTrack = false;
+						inFirstTrack = FALSE;
 					}
 					curTrackEndPosition = curTrackStartPosition
 											.add( curTrack.measure )
@@ -1494,15 +1594,15 @@ Note:						If you change or improve on this script, please let us know by
 					for (i=0, len=curTrack.items.length; i < len; i++)
 					{
 						curItem = curTrack.items[i];
-						curGridItemUsedStyle = window.getComputedStyle(curItem.itemElement, null);
+						curGridItemUsedStyle = WINDOW.getComputedStyle(curItem.itemElement, NULL);
 						// For spanning elements, we can have a single cell occupying more than one track.
 						// The first track that contains it will trigger its verification.
-						if ( ( verifyingColumnPositions ? curItem.verified.columnPosition : curItem.verified.rowPosition ) !== true )
+						if ( ( verifyingColumnPositions ? curItem.verified.columnPosition : curItem.verified.rowPosition ) !== TRUE )
 						{
 							alignType			= verifyingColumnPositions ? curItem.columnAlign : curItem.rowAlign;
 							actualMeasure		= verifyingHorizontalOffsets ?
-												  GridTest.boxSizeCalculator.calcMarginBoxWidth(curGridItemUsedStyle) :
-												  GridTest.boxSizeCalculator.calcMarginBoxHeight(curGridItemUsedStyle);
+													GridTest.boxSizeCalculator.calcMarginBoxWidth(curGridItemUsedStyle) :
+													GridTest.boxSizeCalculator.calcMarginBoxHeight(curGridItemUsedStyle);
 							firstTrack			= verifyingColumnPositions ? curItem.column : curItem.row;
 							trackSpan			= verifyingColumnPositions ? curItem.columnSpan : curItem.rowSpan;
 							spannedTrackMeasure	= this.getSumOfSpannedTrackMeasures(trackManager, firstTrack, trackSpan);
@@ -1530,8 +1630,8 @@ Note:						If you change or improve on this script, please let us know by
 										alignType = gridAlignEnum.start;
 									}
 									else if ( ! verifyingHorizontalOffsets &&
-											  curGridItemUsedStyle.getPropertyValue("top") === "auto" &&
-											  curGridItemUsedStyle.getPropertyValue("bottom") === "auto" )
+												curGridItemUsedStyle.getPropertyValue("top") === "auto" &&
+												curGridItemUsedStyle.getPropertyValue("bottom") === "auto" )
 									{
 											alignType = gridAlignEnum.start;
 									}
@@ -1566,8 +1666,8 @@ Note:						If you change or improve on this script, please let us know by
 								 * and have them check the writing mode of the root of the document.
 								 **/
 								expectedPosition = verifyingColumnPositions ?
-												   this.getLeftPositionForFixedPosition(curGridItemUsedStyle) :
-												   this.getTopPositionForFixedPosition(curGridItemUsedStyle);
+													 this.getLeftPositionForFixedPosition(curGridItemUsedStyle) :
+													 this.getTopPositionForFixedPosition(curGridItemUsedStyle);
 							}
 							else
 							{
@@ -1648,11 +1748,11 @@ Note:						If you change or improve on this script, please let us know by
 							// (i.e. a different writing mode) which may contain a fractional pixel
 							itemOffsetRounded = itemOffset.getMeasureRoundedToWholePixel();
 
-							if (expectedPositionRounded.equals(itemOffsetRounded) !== true)
+							if (expectedPositionRounded.equals(itemOffsetRounded) !== TRUE)
 							{
 								// If it is center aligned, allow a small margin of error.
 								if ( alignType === gridAlignEnum.center &&
-									  // less than a pixel off
+										// less than a pixel off
 									 Math.abs(expectedPosition
 												.subtract(itemOffset)
 												.getRawMeasure()) < Math.pow(10, precision) &&
@@ -1670,12 +1770,12 @@ Note:						If you change or improve on this script, please let us know by
 								else if (
 									// Offset is reversed; compounding rounding error may have caused a problem.
 									( verifyingHorizontalOffsets &&
-									  this.horizontalOffsetsAreReversed(gridUsedStyle) ||
-	 								  ! verifyingHorizontalOffsets &&
-	 								  this.verticalOffsetsAreReversed(gridUsedStyle) ) &&
+										this.horizontalOffsetsAreReversed(gridUsedStyle) ||
+	 									! verifyingHorizontalOffsets &&
+	 									this.verticalOffsetsAreReversed(gridUsedStyle) ) &&
 									// Stretch/end don't have any additional rounding problems since they hit the far edge.
 									( alignType !== gridAlignEnum.stretch ||
-									  alignType !== gridAlignEnum.end ) &&
+										alignType !== gridAlignEnum.end ) &&
 									// Within 1 pixel.
 									Math.abs(expectedPosition.getRawMeasure() - itemOffset.getRawMeasure()) < 
 										Math.pow(10, precision) )
@@ -1688,7 +1788,7 @@ Note:						If you change or improve on this script, please let us know by
 								}
 								else
 								{
-									this.error = true;
+									this.error = TRUE;
 									console.log( itemId + (verifyingColumnPositions ? "column" : "row") + " " + trackNum + ": " +
 									 			 verificationWord + " position check failed (alignment: " + alignType.keyword +
 												 "; expected (unrounded): " + expectedPosition.getPixelValueString() + "; actual: " +
@@ -1704,21 +1804,21 @@ Note:						If you change or improve on this script, please let us know by
 							}
 							if ( verifyingColumnPositions )
 							{
-								curItem.verified.columnPosition = true;
+								curItem.verified.columnPosition = TRUE;
 							}
 							else
 							{
-								curItem.verified.rowPosition = true;
+								curItem.verified.rowPosition = TRUE;
 							}
 						}
 					}
 					if (curTrack.contentSizedTrack)
 					{
-						lastTrackWasContentSized = true;
+						lastTrackWasContentSized = TRUE;
 					}
 					else
 					{
-						lastTrackWasContentSized = false;
+						lastTrackWasContentSized = FALSE;
 					}
 					curTrack = trackIter.next();
 				}
@@ -1806,12 +1906,12 @@ Note:						If you change or improve on this script, please let us know by
 						// We will need to figure out how to save state about computed style from the parent.
 						continue;
 					}
-					usedStyle	= window.getComputedStyle(curItem, null);
+					usedStyle	= WINDOW.getComputedStyle(curItem, NULL);
 					
 					column		= parseInt(usedStyle.getPropertyValue(GRIDCOLUMN),10);
 					if ( isNaN(column) )
 					{
-						this.error = true;
+						this.error = TRUE;
 						console.log("column is NaN");
 						column = 1;
 					}
@@ -1819,7 +1919,7 @@ Note:						If you change or improve on this script, please let us know by
 					columnSpan = parseInt(usedStyle.getPropertyValue(GRIDCOLUMNSPAN),10);
 					if ( isNaN(columnSpan) )
 					{
-						this.error = true;
+						this.error = TRUE;
 						console.log("column-span is NaN");
 						columnSpan = 1;
 					}
@@ -1827,7 +1927,7 @@ Note:						If you change or improve on this script, please let us know by
 					row = parseInt(usedStyle.getPropertyValue(GRIDROW),10);
 					if ( isNaN(row) )
 					{
-						this.error = true;
+						this.error = TRUE;
 						console.log("row is NaN");
 						row = 1;
 					}
@@ -1835,7 +1935,7 @@ Note:						If you change or improve on this script, please let us know by
 					rowSpan = parseInt(usedStyle.getPropertyValue(GRIDROWSPAN),10);
 					if ( isNaN(rowSpan) )
 					{
-						this.error = true;
+						this.error = TRUE;
 						console.log("row-span is NaN");
 						rowSpan = 1;
 					}
@@ -1843,7 +1943,7 @@ Note:						If you change or improve on this script, please let us know by
 					columnAlignString = usedStyle.getPropertyValue(GRIDCOLUMNALIGN);
 					if ( columnAlignString.length === 0 )
 					{
-						this.error = true;
+						this.error = TRUE;
 						console.log("getPropertyValue for " + GRIDCOLUMNALIGN + " is an empty string");
 					}
 					columnAlign = this.gridAlignStringToEnum(columnAlignString);
@@ -1851,7 +1951,7 @@ Note:						If you change or improve on this script, please let us know by
 					rowAlignString = usedStyle.getPropertyValue(GRIDROWALIGN);
 					if ( columnAlignString.length === 0 )
 					{
-						this.error = true;
+						this.error = TRUE;
 						console.log("getPropertyValue for " + GRIDROWALIGN + " is an empty string");
 					}
 					rowAlign = this.gridAlignStringToEnum(rowAlignString);
@@ -1894,8 +1994,10 @@ Note:						If you change or improve on this script, please let us know by
 						return gridAlignEnum.end;
 					case gridAlignEnum.center.keyword:
 						return gridAlignEnum.center;
+					// default
 					case gridAlignEnum.stretch.keyword:
-					case "": // default
+					case NULL:
+					case "":
 						return gridAlignEnum.stretch;
 					default:
 						console.log("unknown grid align string: " + alignString);
@@ -1911,8 +2013,10 @@ Note:						If you change or improve on this script, please let us know by
 						return positionEnum.absolute;
 					case positionEnum.fixed.keyword:
 						return positionEnum.fixed;
+					 // default
 					case positionEnum['static'].keyword:
-					case "": // default
+					case NULL:
+					case "":
 						return positionEnum['static'];
 					default:
 						console.log("unknown position string: " + positionString);
@@ -1922,8 +2026,10 @@ Note:						If you change or improve on this script, please let us know by
 			{
 				switch ( positionString )
 				{
+					// default
 					case blockProgressionEnum.tb.keyword:
-					case "": // default
+					case NULL:
+					case "":
 						return blockProgressionEnum.tb;
 					case blockProgressionEnum.bt.keyword:
 						return blockProgressionEnum.bt;
@@ -2011,7 +2117,7 @@ Note:						If you change or improve on this script, please let us know by
 				spans					= [],
 				autoTracks				= [],
 				fractionalTracks		= [],
-				respectAvailableLength	= true,
+				respectAvailableLength	= TRUE,
 				iter					= trackManager.getIterator(),
 				curTrack				= iter.next(),
 				curSize, sizingAlternateFraction, i, iLen, curItem, minItemMeasure, maxCellMeasure,
@@ -2025,12 +2131,12 @@ Note:						If you change or improve on this script, please let us know by
 					 availableSpace.getRawMeasure() == 0 )
 				{
 					// Assume we have as much space as we want.
-					respectAvailableLength = false;
+					respectAvailableLength = FALSE;
 				}
 
 				
 				// 9.1.1/9.2.1: [Columns|Widths] are initialized to their minimum [widths|heights].
-				while ( curTrack !== null )
+				while ( curTrack !== NULL )
 				{
 					if ( curTrack.sizingType !== sizingTypeEnum.keyword &&
 						 curTrack.sizingType !== sizingTypeEnum.valueAndUnit)
@@ -2058,7 +2164,7 @@ Note:						If you change or improve on this script, please let us know by
 						}
 						if ( ! sizingAlternateFraction )
 						{
-							curTrack.contentSizedTrack = true;
+							curTrack.contentSizedTrack = TRUE;
 						}
 						
 						for ( i = 0, iLen = curTrack.items.length; i < iLen; i++ )
@@ -2076,7 +2182,7 @@ Note:						If you change or improve on this script, please let us know by
 							if ( ( computingColumns ? curItem.columnSpan : curItem.rowSpan ) > 1 )
 							{
 								// This is a span; determine and save its max width or height for use later in the track sizing algorithm.
-								if ( curItem.maxWidthMeasure === null )
+								if ( curItem.maxWidthMeasure === NULL )
 								{
 									if ( computingColumns )
 									{
@@ -2104,8 +2210,8 @@ Note:						If you change or improve on this script, please let us know by
 							{
 								if ( ! sizingAlternateFraction && 
 									 ( curSize === gridTrackValueEnum.minContent ||
-									   curSize === gridTrackValueEnum.fitContent ||
-									   curSize === gridTrackValueEnum.auto ) )
+										 curSize === gridTrackValueEnum.fitContent ||
+										 curSize === gridTrackValueEnum.auto ) )
 								{
 									if ( computingColumns )
 									{
@@ -2150,7 +2256,7 @@ Note:						If you change or improve on this script, please let us know by
 						{
 							case gridTrackValueEnum.maxContent:
 								actualMeasure = this.getActualTrackMeasure(gridElement, trackNum, computingColumns);
-								if ( actualMeasure.equals(curTrack.maxMeasure) !== true )
+								if ( actualMeasure.equals(curTrack.maxMeasure) !== TRUE )
 								{
 									// Not an error; we will catch the problem later when we verify grid items.
 									console.log( (computingColumns ? "Column" : "Row") + " " + curTrack.number + 
@@ -2162,7 +2268,7 @@ Note:						If you change or improve on this script, please let us know by
 								break;
 							case gridTrackValueEnum.minContent:
 								actualMeasure = this.getActualTrackMeasure(gridElement, trackNum, computingColumns);
-								if ( actualMeasure.equals(curTrack.minMeasure) !== true )
+								if ( actualMeasure.equals(curTrack.minMeasure) !== TRUE )
 								{
 									// Not an error; we will catch the problem later when we verify grid items.
 									console.log( (computingColumns ? "Column" : "Row") + " " + curTrack.number + 
@@ -2181,7 +2287,7 @@ Note:						If you change or improve on this script, please let us know by
 					}
 					if ( curTrack.sizingType === sizingTypeEnum.keyword &&
 						 ( curTrack.size === gridTrackValueEnum.auto ||
-						   curTrack.size === gridTrackValueEnum.fitContent ) )
+							 curTrack.size === gridTrackValueEnum.fitContent ) )
 					{
 						autoTracks.push(curTrack);
 					}
@@ -2201,7 +2307,7 @@ Note:						If you change or improve on this script, please let us know by
 						}
 						else {
 							// Track lengths are assumed to always be in pixels or fractions. Convert before going into this function.
-							this.error = true;
+							this.error = TRUE;
 							console.log("track size not converted into px!");
 							// TODO: throw after we start doing conversions and don't want to ignore this anymore.
 						}
@@ -2254,7 +2360,7 @@ Note:						If you change or improve on this script, please let us know by
 					}
 
 					sumOfTrackMeasures	= this.getSumOfSpannedTrackMeasures(trackManager, firstTrack, numSpanned);
-					measureSpanCanGrow	= (computingColumns === true ? curSpanningItem.maxWidthMeasure
+					measureSpanCanGrow	= (computingColumns === TRUE ? curSpanningItem.maxWidthMeasure
 																	 : curSpanningItem.maxHeightMeasure).subtract(sumOfTrackMeasures);
 
 					if ( measureSpanCanGrow.getRawMeasure() > 0 )
@@ -2274,7 +2380,7 @@ Note:						If you change or improve on this script, please let us know by
 				 **/
 				if ( fractionalTracks.length > 0 &&
 					 ( remainingSpace.getRawMeasure() > 0 ||
-					   useAlternateFractionalSizing ) )
+						 useAlternateFractionalSizing ) )
 				{
 					if ( ! useAlternateFractionalSizing ||
 						 respectAvailableLength )
@@ -2287,7 +2393,7 @@ Note:						If you change or improve on this script, please let us know by
 					{
 						sumOfFractions += fractionalTracks[i].size.value;
 					}
-					oneFractionMeasure = null;
+					oneFractionMeasure = NULL;
 					if ( ! useAlternateFractionalSizing )
 					{
 						oneFractionMeasure = remainingSpace.divide(sumOfFractions);
@@ -2396,7 +2502,7 @@ Note:						If you change or improve on this script, please let us know by
 				for ( i = 0; i < iLen; i++ )
 				{
 					actualMeasure = this.getActualTrackMeasure(gridElement, tracks[i].number, computingColumns);
-					if ( actualMeasure.equals(tracks[i].measure) !== true )
+					if ( actualMeasure.equals(tracks[i].measure) !== TRUE )
 					{
 						// If we are one layout pixel off, just pick up what the actual value is and consider it close enough.
 						if ( Math.abs(tracks[i].measure.subtract(actualMeasure).getRawMeasure()) <= 1 )
@@ -2482,9 +2588,9 @@ Note:						If you change or improve on this script, please let us know by
 			{
 				if ( ( larger - smaller ) <= 1 )
 				{
-					return true;
+					return TRUE;
 				}
-				return false;
+				return FALSE;
 			},
 			determineMeasureOfOneFractionUnconstrained: function (fractionalTracks)
 			{
@@ -2512,16 +2618,16 @@ Note:						If you change or improve on this script, please let us know by
 				curTrack	= iter.next(),
 				i, iLen, curItem;
 
-				while ( curTrack !== null )
+				while ( curTrack !== NULL )
 				{
 					for ( i=0, iLen=curTrack.items.length; i < iLen; i++ )
 					{
 						curItem = curTrack.items[i];
-						if ( curItem.usedWidthMeasure === null )
+						if ( curItem.usedWidthMeasure === NULL )
 						{
 							curItem.usedWidthMeasure	= this.getSumOfSpannedTrackMeasures(
 															columnTrackManager, curItem.column, curItem.columnSpan
-														  );
+															);
 						}
 					}
 					curTrack = iter.next();
@@ -2533,7 +2639,7 @@ Note:						If you change or improve on this script, please let us know by
 				sum			= layoutMeasure.zero(),
 				trackIter	= trackManager.getIterator(),
 				curTrack	= trackIter.next();
-				while ( curTrack !== null )
+				while ( curTrack !== NULL )
 				{
 					sum = sum.add(curTrack.measure);
 					curTrack = trackIter.next();
@@ -2551,7 +2657,7 @@ Note:						If you change or improve on this script, please let us know by
 					size = tracks[i].size;
 					if ( tracks[i].sizingType === sizingTypeEnum.keyword &&
 						 ( size === gridTrackValueEnum.fitContent ||
-						   size === gridTrackValueEnum.auto ) )
+							 size === gridTrackValueEnum.auto ) )
 					{
 						contentBasedTracks.push(tracks[i]);
 					}
@@ -2594,9 +2700,9 @@ Note:						If you change or improve on this script, please let us know by
 				}
 				return remainingSpace;
 			}
-		};
-
-		this.propertyParser = {
+		},
+		
+		propertyParser: {
 			// Parses property string definitions and get an associative array of track objects.
 			parseGridTracksString: function ( tracksDefinition, trackManager )
 			{
@@ -2607,8 +2713,8 @@ Note:						If you change or improve on this script, please let us know by
 				i, newTrack, valueAndUnit;
 				if ( length === 1 &&
 					 ( trackStrings[0].length === 0 ||
-					   trackStrings[0].toLowerCase() === "none")
-				   )
+						 trackStrings[0].toLowerCase() === "none")
+					 )
 				{
 					// Empty definition.
 				}
@@ -2618,7 +2724,7 @@ Note:						If you change or improve on this script, please let us know by
 					{
 						trackStrings[i] = trackStrings[i].toLowerCase();
 
-						newTrack = null;
+						newTrack = NULL;
 						if ( this.isKeywordTrackDefinition(trackStrings[i]) )
 						{
 							newTrack			= new Track();
@@ -2631,8 +2737,8 @@ Note:						If you change or improve on this script, please let us know by
 						{
 							// Not a keyword; this is a CSS value.
 							valueAndUnit = this.tryParseCssValue(trackStrings[i]);
-							if ( valueAndUnit.value === null ||
-								 valueAndUnit.unit === null )
+							if ( valueAndUnit.value === NULL ||
+								 valueAndUnit.unit === NULL )
 							{
 								console.log("Not a keyword or a valid CSS value; track " + (i + 1) + " = " + trackStrings[i]);
 								console.log("Invalid track definition '" + trackStrings[i] + "'");
@@ -2679,7 +2785,7 @@ Note:						If you change or improve on this script, please let us know by
 			},
 			isValidCssValueUnit: function (unit)
 			{
-				var ret = false;
+				var ret = FALSE;
 				switch (unit)
 				{
 					case 'px':
@@ -2697,25 +2803,25 @@ Note:						If you change or improve on this script, please let us know by
 					case 'ch':
 					case 'rem':
 					case 'fr': // Grid only
-						ret = true;
+						ret = TRUE;
 				}
 				return ret;
 			},
 			isKeywordTrackDefinition: function (definition)
 			{
-				var ret = false;
+				var ret = FALSE;
 				switch (definition)
 				{
 					case gridTrackValueEnum.auto.keyword:
 					case gridTrackValueEnum.minContent.keyword:
 					case gridTrackValueEnum.maxContent.keyword:
 					case gridTrackValueEnum.fitContent.keyword:
-						ret = true;
+						ret = TRUE;
 				}
 				return ret;
 			}
-		};
-	}
+		}
+	};
 	
 	function LayoutMeasure()
 	{
@@ -2924,7 +3030,7 @@ Note:						If you change or improve on this script, please let us know by
 				 trackNumber <= lastTrackNumber )
 			{
 				// This range covers the explicit track we are adding. Split, if necessary, and vacate the track.
-				nextRange = i < len - 1 ? null : this.implicitTrackRanges[i + 1];
+				nextRange = i < len - 1 ? NULL : this.implicitTrackRanges[i + 1];
 				// In the first track this range covers.
 				if ( trackNumber === curRange.firstNumber )
 				{
@@ -2980,7 +3086,7 @@ Note:						If you change or improve on this script, please let us know by
 		newTrack.number		= firstTrackNumber;
 		newTrack.sizingType = sizingTypeEnum.keyword;
 		newTrack.size		= gridTrackValueEnum.auto;
-		newTrack.implicit	= true;
+		newTrack.implicit	= TRUE;
 		
 		if ( len === 0 ||
 			 firstTrackNumber > this.tracks[len-1].number )
@@ -3085,7 +3191,7 @@ Note:						If you change or improve on this script, please let us know by
 				rangeToCreate				= rangesToCreate[newRangeIndex];
 				rangeToCreateFirstNumber	= rangeToCreate.first;
 				rangeToCreateLastNumber		= rangeToCreate.last;
-				needToCreateRange			= true;
+				needToCreateRange			= TRUE;
 				implicitTrackRangesLength	= this.implicitTrackRanges.length;
 				for ( ; existingRangeIndex < implicitTrackRangesLength; existingRangeIndex++ )
 				{
@@ -3106,9 +3212,9 @@ Note:						If you change or improve on this script, please let us know by
 					}
 					// Check if this same range already exists.
 					else if ( rangeToCreateFirstNumber == existingRangeFirstNumber &&
-							  rangeToCreateLastNumber == existingRangeLastNumber )
+								rangeToCreateLastNumber == existingRangeLastNumber )
 					{
-						needToCreateRange = false;
+						needToCreateRange = FALSE;
 						break;
 					}
 					// We have some intersection. 
@@ -3147,7 +3253,7 @@ Note:						If you change or improve on this script, please let us know by
 						}
 						// Remove the old range.
 						this.implicitTrackRanges.splice(existingRangeIndex, 1);
-						needToCreateRange = false;
+						needToCreateRange = FALSE;
 						break;
 					}
 				}
@@ -3244,39 +3350,39 @@ Note:						If you change or improve on this script, please let us know by
 		{
 			if ( GridTest.trackIsFractionSized( this.tracks[i] ) )
 			{
-				return true;
+				return TRUE;
 			}
 		}
-		return false;
+		return FALSE;
 	};
 	
 	function TrackIterator ( trackManager )
 	{
-		this.iteratingtracks				= true;
+		this.iteratingtracks				= TRUE;
 		this.currentTrackIndex				= 0;
 		this.currentImplicitTrackRangeIndex = 0;
 	}
 	TrackIterator.prototype.reset = function()
 	{
-		iteratingtracks = true;
+		iteratingtracks = TRUE;
 		currentTrackIndex = 0;
 		currentImplicitTrackRangeIndex = 0;
 	};
 	TrackIterator.prototype.next = function()
 	{
 		var
-		next = null,
-		returnNextTrackRange = false;
+		next = NULL,
+		returnNextTrackRange = FALSE;
 		if ( currentTrackIndex >= trackManager.tracks.length )
 		{
-			returnNextTrackRange = true;
+			returnNextTrackRange = TRUE;
 		}
 		else if ( currentImplicitTrackRangeIndex < trackManager.implicitTrackRanges.length )
 		{
 			// We have both a non-range track and a range track-- check to see if we should return the track range first.
 			if ( trackManager.implicitTrackRanges[currentImplicitTrackRangeIndex].firstNumber < trackManager.tracks[currentTrackIndex].number )
 			{
-				returnNextTrackRange = true;
+				returnNextTrackRange = TRUE;
 			}
 		}
 		if ( returnNextTrackRange &&
@@ -3297,15 +3403,15 @@ Note:						If you change or improve on this script, please let us know by
 	
 	
 	// for Mozilla/Safari/Opera
-	if ( WINDOW.addEventListener )
-	{
-		WINDOW.addEventListener( ONRESIZE, GridManager.layout, FALSE );
-	}
-	// If IE event model is used
-	else if ( WINDOW.attachEvent )
-	{
-		// ensure firing before onload, maybe late but safe also for iframes
-		WINDOW.attachEvent( ONRESIZE, GridManager.layout );
-	}
+	//if ( WINDOW.addEventListener )
+	//{
+	//	WINDOW.addEventListener( ONRESIZE, GridManager.layout, FALSE );
+	//}
+	//// If IE event model is used
+	//else if ( WINDOW.attachEvent )
+	//{
+	//	// ensure firing before onload, maybe late but safe also for iframes
+	//	WINDOW.attachEvent( ONRESIZE, GridManager.layout );
+	//}
 	
 })(eCSStender);
