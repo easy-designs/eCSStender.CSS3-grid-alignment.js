@@ -18,6 +18,8 @@ Note:						If you change or improve on this script, please let us know by
 	TRUE		= true,
 	FALSE		= false,
 	WINDOW		= window,
+	DOCUMENT	= document,
+	DOCELMT		= DOCUMENT.documentElement,
 	
 	PROPERTY	= 'property',
 	MOZ			= '-moz-',
@@ -45,7 +47,7 @@ Note:						If you change or improve on this script, please let us know by
 	BOXSIZING			= "box-sizing",
 	BLOCKPROGRESSION	= "block-progression",
 
-	precision					= 2,
+	precision					= 0, // decimal places
 	agentTruncatesLayoutLengths	= TRUE,
 
 	regexSpaces = /\s+/,
@@ -208,9 +210,11 @@ Note:						If you change or improve on this script, please let us know by
 				var
 				els		= select( selector ),
 				eLen	= els.length,
-				children, grid_items, c, b, found, f;
+				children, grid_items, c, b, found, f,
+				gridObject;
 
 				// loop
+				// TODO: Don't forget non-layed out children
 				while ( eLen-- )
 				{
 					children	= els[eLen].children;
@@ -234,14 +238,13 @@ Note:						If you change or improve on this script, please let us know by
 										element: children[c],
 										details: bullpen[b]
 									});
-									bullpen.splice(b,1);
 									break;
 								}
 							}
 						}
 					}
-					console.log(grid_items);
-					GridTest.verifyLayout( els[eLen], properties );
+					gridObject = new Grid( els[eLen], properties, grid_items );
+					gridObject.layout();
 				}
 			}
 			
@@ -264,10 +267,11 @@ Note:						If you change or improve on this script, please let us know by
 		this.unit	= NULL;
 	}
 	
-	function Grid( element, properties )
+	function Grid( element, properties, grid_items )
 	{
 		this.gridElement				= element;
 		this.properties					= properties;
+		this.grid_items					= grid_items;
 		this.blockProgression			= GridTest.layoutVerifier.blockProgressionStringToEnum(
 											getCSSValue( element, BLOCKPROGRESSION )
 										  );
@@ -279,6 +283,385 @@ Note:						If you change or improve on this script, please let us know by
 		this.columnTrackManager			= new TrackManager();
 		this.rowTrackManager			= new TrackManager();
 	}
+	Grid.prototype.layout = function()
+	{
+		var
+		gridElement = this.gridElement,
+		gridCols	= this.properties['grid-columns'] || 'none',
+		gridRows	= this.properties['grid-rows'] || 'none';
+
+		console.log('laying out');
+
+		// Get the available space for the grid since it is required
+		// for determining track sizes for auto/fit-content/minmax 
+		// and fractional tracks.
+		this.determineGridAvailableSpace();
+
+		console.log( "Grid element content available space: columns = " + 
+					 this.availableSpaceForColumns.getPixelValueString() + "; rows = " +
+					 this.availableSpaceForRows.getPixelValueString() );
+        
+		GridTest.propertyParser.parseGridTracksString( gridCols, this.columnTrackManager );
+		GridTest.propertyParser.parseGridTracksString( gridRows, this.rowTrackManager );
+        
+		this.mapGridItemsToTracks();
+		this.saveItemPositioningTypes();
+		//
+		//this.determineTrackSizes(
+		//	gridObject.gridElement, gridObject.columnTrackManager, gridObject.availableSpaceForColumns,
+		//	"width", gridObject.useAlternateFractionalSizingForColumns
+		//);
+		//this.determineTrackSizes(
+		//	gridObject.gridElement, gridObject.rowTrackManager, gridObject.availableSpaceForRows,
+		//	"height", gridObject.useAlternateFractionalSizingForRows
+		//);
+        //
+		//this.calculateGridItemShrinkToFitSizes(gridObject);
+        //
+		//this.verifyGridItemSizes(gridObject);
+		//this.verifyGridItemPositions(gridObject);
+        //
+		//return ! this.error;
+	};
+	/* Determines the available space for the grid by:
+	 * 1. Swapping in a dummy block|inline-block element where the grid 
+	 *    element was with one fractionally sized column and one fractionally sized row,
+	 *    causing it to take up all available space.
+	 *    a. If getting the cascaded (not used) style is possible (IE only),
+	 * 		 copy the same width/height/box-sizing values to ensure the available
+	 *	 	 space takes into account explicit constraints.
+	 * 2. Querying for the used widths/heights
+	 * 3. Swapping back the real grid element
+	 * Yes, this depends on the dummy block|inline-block sizing to work correctly.
+	 **/
+	Grid.prototype.determineGridAvailableSpace = function()
+	{
+		var
+		gridElement			= this.gridElement,
+		gridProperties		= this.properties,
+		gridElementParent	= gridElement.parentNode,
+		isInlineGrid,
+		sides	= ['top','right','bottom','left'],
+		s		= sides.length,
+		margins = {}, padding = {}, borders = {}, width, height,
+		dummy, widthToUse, heightToUse, marginToUse, borderWidthToUse, borderStyleToUse, paddingToUse,
+		cssText, scrollWidth, scrollHeight, removedElement,
+		widthAdjustment, heightAdjustment, widthMeasure, heightMeasure, widthAdjustmentMeasure, heightAdjustmentMeasure;
+        
+		// we need to get grid props from the passed styles
+		isInlineGrid = gridProperties.display === INLINEGRID ? TRUE : FALSE;
+        
+		// Get each individual margin, border, and padding value for
+		// using with calc() when specifying the width/height of the dummy element.
+		while ( s-- )
+		{
+			margins[sides[s]] = getCSSValue( gridElement, 'margin-' + sides[s] );
+			padding[sides[s]] = getCSSValue( gridElement, 'padding-' + sides[s] );
+			borders[sides[s]] = getCSSValue( gridElement, 'border-' + sides[s] + '-width' );
+		}
+        
+		// If the grid has an explicit width and/or height, that determines the available space for the tracks.
+		// If there is none, we need to use alternate fractional sizing. The exception is if we are a non-inline grid;
+		// in that case, we are a block element and take up all available width.
+		// TODO: ensure we do the right thing for floats.
+		width = getCSSValue( gridElement, 'width' );
+		if ( width === "auto" &&
+		 	 ( isInlineGrid || getCSSValue( gridElement, 'float' ) !== "none" ) )
+		{
+			this.useAlternateFractionalSizingForColumns = TRUE;
+		}
+		height = getCSSValue( gridElement, 'height' );
+		if ( height === "auto" )
+		{
+			this.useAlternateFractionalSizingForRows = TRUE;
+		}
+        
+		// build the straw man for getting dimensions
+		dummy = document.createElement( gridElement.tagName );
+		widthToUse	= width !== "auto"	? width
+										: this.determineWidth( gridElement, margins, padding, borders );
+		heightToUse = height !== "auto" ? height
+										: this.determineHeight( gridElement, margins, padding, borders );
+		marginToUse			= getCSSValue( gridElement, 'margin' );
+		borderWidthToUse	= getCSSValue( gridElement, 'border-width' );
+		borderStyleToUse	= getCSSValue( gridElement, 'border-style' );
+		paddingToUse		= getCSSValue( gridElement, 'padding' );
+		cssText = "display: " + ( ! isInlineGrid ? "block" : "inline-block" )
+				+ "; margin: " + marginToUse + "; border-width: " + borderWidthToUse
+				+ "; padding: " + paddingToUse + "; border-style: " + borderStyleToUse
+				+ "; width: " + widthToUse
+				+ "; height: " + heightToUse
+				+ "; box-sizing: " + getCSSValue( gridElement, 'box-sizing' )
+				+ "; min-width: " + getCSSValue( gridElement, 'min-width' )
+				+ "; min-height: " + getCSSValue( gridElement, 'min-height' )
+				+ "; max-width: " + getCSSValue( gridElement, 'max-width' )
+				+ "; max-height: " + getCSSValue( gridElement, 'max-height' );
+		dummy.style.cssText = cssText;
+        
+		// Determine width/height (if any) of scrollbars are showing with the grid element on the page.
+		scrollWidth		= this.verticalScrollbarWidth();
+		scrollHeight	= this.horizontalScrollbarHeight();
+        
+		// Insert before the real grid element.
+		gridElementParent.insertBefore(dummy, gridElement);
+		
+		// Remove the real grid element.
+		removedElement = gridElementParent.removeChild(gridElement);
+        
+		// The dummy item should never add scrollbars if the grid element didn't.
+		widthAdjustment		= width !== "auto" ? 0 : scrollWidth - this.verticalScrollbarWidth();
+		heightAdjustment	= height !== "auto" ? 0 : scrollHeight - this.horizontalScrollbarHeight();
+        
+		// get the final measurements
+		widthMeasure			= LayoutMeasure.measureFromStyleProperty( dummy, 'width' );
+		heightMeasure			= LayoutMeasure.measureFromStyleProperty( dummy, 'height' );
+		widthAdjustmentMeasure	= LayoutMeasure.measureFromPx( widthAdjustment );
+		heightAdjustmentMeasure	= LayoutMeasure.measureFromPx( heightAdjustment );
+		
+		// Get the content width/height; this is the available space for tracks and grid items to be placed in.
+		if ( ! GridTest.shouldSwapWidthAndHeight( this.blockProgression ) )
+		{
+			this.availableSpaceForColumns	= widthMeasure.subtract(widthAdjustmentMeasure);
+			this.availableSpaceForRows		= heightMeasure.subtract(heightAdjustmentMeasure);
+		}
+		else
+		{
+			this.availableSpaceForColumns	= heightMeasure.subtract(heightAdjustmentMeasure);
+			this.availableSpaceForRows		= widthMeasure.subtract(widthAdjustmentMeasure);
+		}
+        
+		// Restore the DOM.
+		gridElementParent.insertBefore( removedElement, dummy );
+		gridElementParent.removeChild( dummy );
+	};
+	Grid.prototype.determineWidth = function ( el, margins, padding, borders )
+	{
+		var
+		parent = el.parentNode,
+		width  = parent.offsetWidth;
+		width -= getCSSValue( parent, 'border-left' );
+		width -= getCSSValue( parent, 'padding-left' );
+		width -= getCSSValue( parent, 'padding-right' );
+		width -= getCSSValue( parent, 'border-right' );
+		width -= ( margins.left + margins.right );
+		width -= ( borders.left + borders.right );
+		width -= ( padding.left + padding.right );
+		console.log('height: ' +height);
+		return width;
+	};
+	Grid.prototype.determineHeight = function ( el, margins, padding, borders )
+	{
+		var
+		parent = el.parentNode,
+		height  = parent.offsetHeight;
+		height -= getCSSValue( parent, 'border-top' );
+		height -= getCSSValue( parent, 'padding-top' );
+		height -= getCSSValue( parent, 'padding-bottom' );
+		height -= getCSSValue( parent, 'border-bottom' );
+		height -= ( margins.top + margins.bottom );
+		height -= ( borders.top + borders.bottom );
+		height -= ( padding.top + padding.bottom );
+		console.log('height: ' +height);
+		return height;
+	};
+	Grid.prototype.verticalScrollbarWidth = function()
+	{
+		return ( self.innerWidth - DOCELMT.clientWidth );
+	};
+	Grid.prototype.horizontalScrollbarHeight = function()
+	{
+		return ( self.innerHeight - DOCELMT.clientHeight );
+	};
+	Grid.prototype.mapGridItemsToTracks = function ()
+	{
+		var
+		items	= [],
+		i		= this.grid_items.length,
+		curItem, column, columnSpan, row, rowSpan,
+		columnAlignString, columnAlign, rowAlignString, rowAlign,
+		boxSizing, newItem, firstColumn, lastColumn, firstRow, lastRow;
+		
+		while ( i-- )
+		{
+			curItem = this.grid_items[i];
+
+			column	= parseInt( curItem.details.properties[GRIDCOLUMN], 10 );
+			if ( isNaN(column) )
+			{
+				this.error = TRUE;
+				console.log("column is NaN");
+				column = 1;
+			}
+
+			columnSpan = parseInt( curItem.details.properties[GRIDCOLUMNSPAN], 10 );
+			if ( isNaN(columnSpan) )
+			{
+				this.error = TRUE;
+				console.log("column-span is NaN");
+				columnSpan = 1;
+			}
+			
+			row = parseInt( curItem.details.properties[GRIDROW], 10 );
+			if ( isNaN(row) )
+			{
+				this.error = TRUE;
+				console.log("row is NaN");
+				row = 1;
+			}
+			
+			rowSpan = parseInt( curItem.details.properties[GRIDROWSPAN], 10 );
+			if ( isNaN(rowSpan) )
+			{
+				this.error = TRUE;
+				console.log("row-span is NaN");
+				rowSpan = 1;
+			}
+
+			columnAlignString = curItem.details.properties[GRIDCOLUMNALIGN] || '';
+			if ( columnAlignString.length === 0 )
+			{
+				this.error = TRUE;
+				console.log("getPropertyValue for " + GRIDCOLUMNALIGN + " is an empty string");
+			}
+			columnAlign = this.gridAlignStringToEnum(columnAlignString);
+
+			rowAlignString = curItem.details.properties[GRIDROWALIGN] || '';
+			if ( rowAlignString.length === 0 )
+			{
+				this.error = TRUE;
+				console.log("getPropertyValue for " + GRIDROWALIGN + " is an empty string");
+			}
+			rowAlign = this.gridAlignStringToEnum(rowAlignString);
+
+			// TODO: handle directionality. These properties are physical; we probably need to map them to logical values.
+			boxSizing = getCSSValue( curItem.element, BOXSIZING );
+
+			newItem				= new Item();
+			newItem.itemElement	= curItem.element;
+			newItem.styles		= curItem.details;
+			newItem.column		= column;
+			newItem.columnSpan	= columnSpan;
+			newItem.columnAlign	= columnAlign;
+			newItem.row			= row;
+			newItem.rowSpan		= rowSpan;
+			newItem.rowAlign	= rowAlign;
+
+			firstColumn			= newItem.column;
+			lastColumn			= firstColumn + newItem.columnSpan - 1;
+			firstRow			= newItem.row;
+			lastRow				= firstRow + newItem.rowSpan - 1;
+
+			// Ensure implicit track definitions exist for all tracks this item spans.
+			this.ensureTracksExist( this.columnTrackManager, firstColumn, lastColumn );
+			this.ensureTracksExist( this.rowTrackManager, firstRow, lastRow );
+
+			// place the items as appropriate
+			this.addItemToTracks( this.columnTrackManager, newItem, firstColumn, lastColumn );
+			this.addItemToTracks( this.rowTrackManager, newItem, firstRow, lastRow );
+			
+			items.push(newItem);
+		}
+		this.items = items;
+	};
+	Grid.prototype.gridAlignStringToEnum = function ( alignString )
+	{
+		switch ( alignString )
+		{
+			case gridAlignEnum.start.keyword:
+				return gridAlignEnum.start;
+			case gridAlignEnum.end.keyword:
+				return gridAlignEnum.end;
+			case gridAlignEnum.center.keyword:
+				return gridAlignEnum.center;
+			// default
+			case gridAlignEnum.stretch.keyword:
+			case NULL:
+			case "":
+				return gridAlignEnum.stretch;
+			default:
+				console.log("unknown grid align string: " + alignString);
+		}
+	};
+	Grid.prototype.positionStringToEnum = function ( positionString )
+	{
+		switch ( positionString )
+		{
+			case positionEnum.relative.keyword:
+				return positionEnum.relative;
+			case positionEnum.absolute.keyword:
+				return positionEnum.absolute;
+			case positionEnum.fixed.keyword:
+				return positionEnum.fixed;
+			 // default
+			case positionEnum['static'].keyword:
+			case NULL:
+			case "":
+				return positionEnum['static'];
+			default:
+				console.log("unknown position string: " + positionString);
+		}
+	};
+	// Creates track objects for implicit tracks if needed.
+	Grid.prototype.ensureTracksExist = function ( trackManager, firstTrackNumber, lastTrackNumber )
+	{
+		/* TODO: we need a better data structure for tracks created by spans.
+		 * If a grid item has a really high span value,
+		 * we currently end up creating implicit tracks for every one of the
+		 * implicit tracks (span 100000=>100000 tracks created).
+		 * Instead, a single track object should be able to represent multiple
+		 * implicit tracks. The number of implicit tracks it represents would 
+		 * be used during the track sizing algorithm when redistributing space
+		 * among each of the tracks to ensure it gets the right proportional amount.
+		 **/
+		trackManager.ensureTracksExist( firstTrackNumber, lastTrackNumber );
+	};
+	// Traverses all tracks that the item belongs to and adds a reference to it in each of the track objects.
+	Grid.prototype.addItemToTracks = function (trackManager, itemToAdd, firstTrackNumber, lastTrackNumber)
+	{
+		var
+		i					= 0,
+		tracks				= trackManager.tracks.length,
+		implicitTrackIndex	= 0,
+		implicitTracks		= trackManager.implicitTracks;
+		
+		for ( ; i < tracks; i++)
+		{
+			if ( trackManager.tracks[i].number === firstTrackNumber )
+			{
+				trackManager.tracks[i].items.push(itemToAdd);
+			}
+			else if ( trackManager.tracks[i].number > firstTrackNumber )
+			{
+				break;
+			}
+		}
+		// TODO: check if we can remove this.
+		for ( ; implicitTrackIndex < implicitTracks; implicitTrackIndex++ )
+		{
+			if ( firstTrackNumber >= trackManager.implicitTracks[implicitTrackIndex].firstNumber &&
+				 lastTrackNumber <= trackManager.implicitTracks[implicitTrackIndex].length )
+			{
+				trackManager.implicitTracks[implicitTrackIndex].items.push(itemToAdd);
+			}
+		}
+	};
+	Grid.prototype.saveItemPositioningTypes = function()
+	{
+		console.log('saving positioning types');
+		var
+		items	= this.items,
+		i		= items.length;
+		while ( i-- )
+		{
+			if ( items[i].position === NULL )
+			{
+				items[i].position	= this.positionStringToEnum( getCSSValue( items[i].itemElement, 'position' ) );
+			}
+		}
+	};
+	
+	
+	
 	
 	function Track()
 	{
@@ -306,6 +689,7 @@ Note:						If you change or improve on this script, please let us know by
 	function Item()
 	{
 		this.itemElement		= NULL;
+		this.styles				= NULL;
 		this.position			= NULL;
 		this.column				= 1;
 		this.columnSpan			= 1;
@@ -734,227 +1118,7 @@ Note:						If you change or improve on this script, please let us know by
 				return ! this.error;
 			},
 
-			/* Determines the available space for the grid by:
-			 * 1. Swapping in a dummy block|inline-block element where the grid 
-			 *    element was with one fractionally sized column and one fractionally sized row,
-			 *    causing it to take up all available space.
-			 *    a. If getting the cascaded (not used) style is possible (IE only),
-			 * 		 copy the same width/height/box-sizing values to ensure the available
-			 *	 	 space takes into account explicit constraints.
-			 * 2. Querying for the used widths/heights
-			 * 3. Swapping back the real grid element
-			 * Yes, this depends on the dummy block|inline-block sizing to work correctly.
-			 **/
-			determineGridAvailableSpace: function ( gridObject )
-			{
-				var
-				gridElement			= gridObject.gridElement,
-				gridProperties		= gridObject.properties,
-				gridElementParent	= gridElement.parentNode,
-				
-				isInlineGrid, currentStyle,
-				marginLeft, marginRight, paddingLeft, paddingRight, borderLeftWidth, borderRightWidth,
-				marginTop, marginBottom, paddingTop, paddingBottom, borderTopWidth, borderBottomWidth,
-				dummy, widthToUse, heightToUse, marginToUse, borderWidthToUse, borderStyleToUse, paddingToUse,
-				cssText, scrollWidth, scrollHeight,
-				removedElement, dummyUsedStyle,
-				widthAdjustment, heightAdjustment, widthMeasure, heightMeasure, widthAdjustmentMeasure, heightAdjustmentMeasure;
-
-				// Get each individual margin, border, and padding value for
-				// using with calc() when specifying the width/height of the dummy element.
-				console.log(gridProperties);
-				if ( typeof gridElement.currentStyle !== "undefined" )
-				{
-					currentStyle = gridElement.currentStyle;
-					
-					// Use the IE-only interface for getting computed (not used) styles via the DOM.
-					isInlineGrid = currentStyle.display === INLINEGRID ? TRUE : FALSE;
-
-					marginLeft = currentStyle.marginLeft;
-					if ( marginLeft === "auto" )
-					{
-						marginLeft = "0px";
-					}
-					marginRight = currentStyle.marginRight;
-					if ( marginRight === "auto" )
-					{
-						marginRight = "0px";
-					}
-					borderLeftWidth		= currentStyle.borderLeftWidth;
-					borderRightWidth	= currentStyle.borderRightWidth;
-					paddingLeft			= currentStyle.paddingLeft;
-					paddingRight		= currentStyle.paddingRight;
-
-					marginTop = currentStyle.marginTop;
-					if ( marginTop === "auto" )
-					{
-						marginTop = "0px";
-					}
-					marginBottom = currentStyle.marginBottom;
-					if ( marginBottom === "auto" )
-					{
-						marginBottom = "0px";
-					}
-					borderTopWidth		= currentStyle.borderTopWidth;
-					borderBottomWidth	= currentStyle.borderBottomWidth;
-					paddingTop			= currentStyle.paddingTop;
-					paddingBottom		= currentStyle.paddingBottom;
-				}
-				else
-				{
-					// currentStyle not available; the next best thing is the used values for the grid.
-					// This should work even for percentage sized margin/border/padding because the real grid
-					// element should have sized those based on the size of its containing block already.
-					//
-					// Unfortunately, this doesn't work for fixed-width and/or fixed-height grids because this function
-					// should be returning the _available_ space, not the space the current grid element is using.
-					//
-
-					// We need currentStyle support to get the computed (not used) styles of elements.
-					console.log("User agent doesn't support element.currentStyle");
-					return;
-				}
-
-				// If the grid has an explicit width and/or height, that determines the available space for the tracks.
-				// If there is none, we need to use alternate fractional sizing. The exception is if we are a non-inline grid;
-				// in that case, we are a block element and take up all available width.
-				// TODO: ensure we do the right thing for floats.
-				if ( currentStyle.width === "auto" &&
-				 	 ( isInlineGrid || currentStyle['float'] !== "none" ) )
-				{
-					gridObject.useAlternateFractionalSizingForColumns = TRUE;
-					console.log("Using alternate fractional sizing for columns");
-				}
-				if ( currentStyle.height === "auto" )
-				{
-					gridObject.useAlternateFractionalSizingForRows = TRUE;
-					console.log("Using alternate fractional sizing for rows");
-				}
-
-				dummy = document.createElement( gridElement.tagName );
-
-				/* TODO: Walk the parents of the grid until we find one that isn't
-				 * auto width and height, setting any auto widths/heights to 100%.
-				 * Then take our measurement and restore their original values.
-				 **/
-				/* TODO: handle non-pixel based margins/borders/padding
-				 * Default to 100% if there is no specified width/height.
-				 **/
-				widthToUse	= currentStyle.width !== "auto" ? currentStyle.width
-															: this.buildCalcString(
-																"100%", "-", marginLeft, borderLeftWidth, 
-																paddingLeft, paddingRight, borderRightWidth, marginRight
-																);
-				heightToUse = currentStyle.width !== "auto" ? currentStyle.height
-															: this.buildCalcString(
-																"100%", "-", marginTop, borderTopWidth,
-																paddingTop, paddingBottom, borderBottomWidth, marginBottom
-																);
-
-				marginToUse = currentStyle.margin;
-				if ( marginToUse === "auto" )
-				{
-					// Workaround for IE bug unspecified margins get returned as "auto" instead of "0px".
-					// Get the used value instead which will be 0px if it was really unspecified or, if not, it really was "auto".
-					if ( usedStyle.margin === "0px" )
-					{
-						marginToUse = usedStyle.margin;
-					}
-				}
-				borderWidthToUse	= currentStyle.borderWidth;
-				borderStyleToUse	= currentStyle.borderStyle;
-				paddingToUse		= currentStyle.padding;
-
-				/* Dummy element style:
-				 * display: block | inline-block; (depending on if this was a grid | inline-grid)
-				 * margin/border/padding: <computed or used value for the real grid element>
-				 **/
-				cssText = "display: " + (!isInlineGrid ? "block" : "inline-block")
-						+ "; margin: " + marginToUse + "; border-width: " + borderWidthToUse
-						+ "; padding: " + paddingToUse + "; border-style: " + borderStyleToUse
-						+ "; width: " + widthToUse
-						+ "; height: " + heightToUse
-						+ "; box-sizing: " + gridElement.currentStyle.boxSizing
-						+ "; min-width: " + gridElement.currentStyle.minWidth
-						+ "; min-height: " + gridElement.currentStyle.minHeight
-						+ "; max-width: " + gridElement.currentStyle.maxWidth
-						+ "; max-height: " + gridElement.currentStyle.maxHeight;
-				dummy.style.cssText = cssText;
-
-				// Determine width/height (if any) of scrollbars are showing with the grid element on the page.
-				scrollWidth		= this.verticalScrollbarWidth();
-				scrollHeight	= this.horizontalScrollbarHeight();
-
-				console.log("Vertical scrollbar width = " + scrollWidth + "; horizontal scrollbar height = " + scrollHeight);
-
-				// Insert before the real grid element.
-				gridElementParent.insertBefore(dummy, gridElement);
-				// Remove the real grid element.
-				removedElement = gridElementParent.removeChild(gridElement);
-
-				dummyUsedStyle = WINDOW.getComputedStyle(dummy, NULL);
-
-				// The dummy item should never add scrollbars if the grid element didn't.
-				widthAdjustment		= scrollWidth - this.verticalScrollbarWidth();
-				heightAdjustment	= scrollHeight - this.horizontalScrollbarHeight();
-				if ( widthAdjustment < 0 || heightAdjustment < 0 )
-				{
-					console.log("determineGridAvailableSpace: dummy item added scrollbars");
-				}
-
-				// Remove any scrollbar adjustment if we weren't auto-sized
-				// (if there is a specified height of, say, 2000px, we don't want to change the height of the available space).
-				if ( currentStyle.width !== "auto" )
-				{
-					widthAdjustment = 0;
-				}
-				if ( currentStyle.height !== "auto" )
-				{
-					heightAdjustment = 0;
-				}
-
-				widthMeasure			= layoutMeasure.measureFromStyleProperty(dummyUsedStyle, "width");
-				heightMeasure			= layoutMeasure.measureFromStyleProperty(dummyUsedStyle, "height");
-				widthAdjustmentMeasure	= layoutMeasure.measureFromPx(widthAdjustment);
-				heightAdjustmentMeasure	= layoutMeasure.measureFromPx(heightAdjustment);
-				// Get the content width/height; this is the available space for tracks and grid items to be placed in.
-				if ( ! GridTest.shouldSwapWidthAndHeight(gridObject.blockProgression) )
-				{
-					gridObject.availableSpaceForColumns	= widthMeasure.subtract(widthAdjustmentMeasure);
-					gridObject.availableSpaceForRows	= heightMeasure.subtract(heightAdjustmentMeasure);
-				}
-				else
-				{
-					gridObject.availableSpaceForColumns	= heightMeasure.subtract(heightAdjustmentMeasure);
-					gridObject.availableSpaceForRows	= widthMeasure.subtract(widthAdjustmentMeasure);
-				}
-
-				// Restore the DOM.
-				gridElementParent.insertBefore(removedElement, dummy);
-				gridElementParent.removeChild(dummy);
-			},
-			verticalScrollbarWidth: function()
-			{
-				return ( self.innerWidth - document.documentElement.clientWidth );
-			},
-			horizontalScrollbarHeight: function()
-			{
-				return (self.innerHeight - document.documentElement.clientHeight);
-			},
-			saveItemPositioningTypes: function (gridObject)
-			{
-				var
-				items = gridObject.items,
-				curItemUsedStyle;
-				for (var i = 0; i < items.length; i++)
-				{
-					if ( items[i].position === NULL )
-					{
-						curItemUsedStyle	= WINDOW.getComputedStyle(items[i].itemElement, NULL);
-						items[i].position	= this.positionStringToEnum(curItemUsedStyle.getPropertyValue("position"));
-					}
-				}
-			},
+			
 			isPercentageValue: function ( valueString )
 			{
 				return ( valueString[valueString.length - 1] === '%' );
@@ -1887,141 +2051,6 @@ Note:						If you change or improve on this script, please let us know by
 				}
 				return sum;
 			},
-			mapGridItemsToTracks: function (gridElement, columnTrackManager, rowTrackManager)
-			{
-				var
-				items	= [],
-				i		= 0,
-				len		= gridElement.childNodes.length,
-				curItem, usedStyle, column, columnSpan, row, rowSpan,
-				columnAlignString, columnAlign, rowAlignString, rowAlign,
-				boxSizing, newItem, firstColumn, lastColumn, firstRow, lastRow;
-				
-				for ( ; i < len; i++ )
-				{
-					curItem = gridElement.childNodes[i];
-					if (curItem instanceof Text)
-					{
-						// TODO: handle text nodes.
-						// We will need to figure out how to save state about computed style from the parent.
-						continue;
-					}
-					usedStyle	= WINDOW.getComputedStyle(curItem, NULL);
-					
-					column		= parseInt(usedStyle.getPropertyValue(GRIDCOLUMN),10);
-					if ( isNaN(column) )
-					{
-						this.error = TRUE;
-						console.log("column is NaN");
-						column = 1;
-					}
-					
-					columnSpan = parseInt(usedStyle.getPropertyValue(GRIDCOLUMNSPAN),10);
-					if ( isNaN(columnSpan) )
-					{
-						this.error = TRUE;
-						console.log("column-span is NaN");
-						columnSpan = 1;
-					}
-					
-					row = parseInt(usedStyle.getPropertyValue(GRIDROW),10);
-					if ( isNaN(row) )
-					{
-						this.error = TRUE;
-						console.log("row is NaN");
-						row = 1;
-					}
-					
-					rowSpan = parseInt(usedStyle.getPropertyValue(GRIDROWSPAN),10);
-					if ( isNaN(rowSpan) )
-					{
-						this.error = TRUE;
-						console.log("row-span is NaN");
-						rowSpan = 1;
-					}
-
-					columnAlignString = usedStyle.getPropertyValue(GRIDCOLUMNALIGN);
-					if ( columnAlignString.length === 0 )
-					{
-						this.error = TRUE;
-						console.log("getPropertyValue for " + GRIDCOLUMNALIGN + " is an empty string");
-					}
-					columnAlign = this.gridAlignStringToEnum(columnAlignString);
-
-					rowAlignString = usedStyle.getPropertyValue(GRIDROWALIGN);
-					if ( columnAlignString.length === 0 )
-					{
-						this.error = TRUE;
-						console.log("getPropertyValue for " + GRIDROWALIGN + " is an empty string");
-					}
-					rowAlign = this.gridAlignStringToEnum(rowAlignString);
-
-					// TODO: handle directionality. These properties are physical; we probably need to map them to logical values.
-					boxSizing = usedStyle.getPropertyValue(BOXSIZING);
-
-					newItem				= new item();
-					newItem.itemElement	= curItem;
-					newItem.column		= column;
-					newItem.columnSpan	= columnSpan;
-					newItem.columnAlign	= columnAlign;
-					newItem.row			= row;
-					newItem.rowSpan		= rowSpan;
-					newItem.rowAlign	= rowAlign;
-
-					firstColumn			= newItem.column;
-					lastColumn			= firstColumn + newItem.columnSpan - 1;
-					firstRow			= newItem.row;
-					lastRow				= firstRow + newItem.rowSpan - 1;
-
-					// Ensure implicit track definitions exist for all tracks this item spans.
-					this.ensureTracksExist(columnTrackManager, firstColumn, lastColumn);
-					this.ensureTracksExist(rowTrackManager, firstRow, lastRow);
-
-					this.addItemToTracks(columnTrackManager, newItem, firstColumn, lastColumn);
-					this.addItemToTracks(rowTrackManager, newItem, firstRow, lastRow);
-
-					items.push(newItem);
-				}
-				return items;
-			},
-			gridAlignStringToEnum: function (alignString)
-			{
-				switch ( alignString )
-				{
-					case gridAlignEnum.start.keyword:
-						return gridAlignEnum.start;
-					case gridAlignEnum.end.keyword:
-						return gridAlignEnum.end;
-					case gridAlignEnum.center.keyword:
-						return gridAlignEnum.center;
-					// default
-					case gridAlignEnum.stretch.keyword:
-					case NULL:
-					case "":
-						return gridAlignEnum.stretch;
-					default:
-						console.log("unknown grid align string: " + alignString);
-				}
-			},
-			positionStringToEnum: function (positionString)
-			{
-				switch ( positionString )
-				{
-					case positionEnum.relative.keyword:
-						return positionEnum.relative;
-					case positionEnum.absolute.keyword:
-						return positionEnum.absolute;
-					case positionEnum.fixed.keyword:
-						return positionEnum.fixed;
-					 // default
-					case positionEnum['static'].keyword:
-					case NULL:
-					case "":
-						return positionEnum['static'];
-					default:
-						console.log("unknown position string: " + positionString);
-				}
-			},
 			blockProgressionStringToEnum: function (positionString)
 			{
 				switch ( positionString )
@@ -2055,50 +2084,6 @@ Note:						If you change or improve on this script, please let us know by
 						return gridTrackValueEnum.fitContent;
 					default:
 						console.log("unknown grid track string: " + trackValueString);
-				}
-			},
-			// Creates track objects for implicit tracks if needed.
-			ensureTracksExist: function (trackManager, firstTrackNumber, lastTrackNumber)
-			{
-				/* TODO: we need a better data structure for tracks created by spans.
-				 * If a grid item has a really high span value,
-				 * we currently end up creating implicit tracks for every one of the
-				 * implicit tracks (span 100000=>100000 tracks created).
-				 * Instead, a single track object should be able to represent multiple
-				 * implicit tracks. The number of implicit tracks it represents would 
-				 * be used during the track sizing algorithm when redistributing space
-				 * among each of the tracks to ensure it gets the right proportional amount.
-				 **/
-				trackManager.ensureTracksExist(firstTrackNumber, lastTrackNumber);
-			},
-			// Traverses all tracks that the item belongs to and adds a reference to it in each of the track objects.
-			addItemToTracks: function (trackManager, itemToAdd, firstTrackNumber, lastTrackNumber)
-			{
-				var
-				i					= 0,
-				tracks				= trackManager.tracks.length,
-				implicitTrackIndex	= 0,
-				implicitTracks		= trackManager.implicitTracks;
-				
-				for ( ; i < tracks; i++)
-				{
-					if ( trackManager.tracks[i].number === firstTrackNumber )
-					{
-						trackManager.tracks[i].items.push(itemToAdd);
-					}
-					else if ( trackManager.tracks[i].number > firstTrackNumber )
-					{
-						break;
-					}
-				}
-				// TODO: check if we can remove this.
-				for ( ; implicitTrackIndex < implicitTracks; implicitTrackIndex++ )
-				{
-					if ( firstTrackNumber >= trackManager.implicitTracks[implicitTrackIndex].firstNumber &&
-						 lastTrackNumber <= trackManager.implicitTracks[implicitTrackIndex].length )
-					{
-						trackManager.implicitTracks[implicitTrackIndex].items.push(itemToAdd);
-					}
 				}
 			},
 			/* Determines track sizes using the algorithm from sections 9.1 and 9.2 of the W3C spec.
@@ -2713,8 +2698,7 @@ Note:						If you change or improve on this script, please let us know by
 				i, newTrack, valueAndUnit;
 				if ( length === 1 &&
 					 ( trackStrings[0].length === 0 ||
-						 trackStrings[0].toLowerCase() === "none")
-					 )
+						 trackStrings[0].toLowerCase() === "none" ) )
 				{
 					// Empty definition.
 				}
@@ -2823,71 +2807,61 @@ Note:						If you change or improve on this script, please let us know by
 		}
 	};
 	
-	function LayoutMeasure()
+	function LayoutMeasure( measure )
 	{
 		if ( measure % 1 !== 0 )
 		{
-			console.log("layoutMeasures must be integers");
+			console.log("LayoutMeasures must be integers");
 		}
 		this.internalMeasure = measure;
-
-		this.measureFromPx = function( measureInPx )
-		{
-			// Convert to accuracy of agent's layout engine.
-			return new LayoutMeasure( Math.round( measureInPx * Math.pow(10, precision) ) );
-		};
+	}
+	LayoutMeasure.measureFromPx = function( measureInPx )
+	{
+		// Convert to accuracy of agent's layout engine.
+		return new LayoutMeasure( Math.round( measureInPx * Math.pow(10, precision) ) );
+	};
+	LayoutMeasure.measureFromPxString = function( measureInPxString )
+	{
+		var
+		length			= measureInPxString.length,
+		wholePart		= 0,
+		fractionPart	= 0,
+		decimalPosition = measureInPxString.indexOf('.');
 		
-		this.measureFromPxString = function( measureInPxString )
-		{
-			var
-			length			= measureInPxString.length,
-			wholePart		= 0,
-			fractionPart	= 0,
-			decimalPosition = measureInPxString.indexOf('.');
-			
-			// Don't depend on a potentially lossy conversion to a float-- we'll parse it ourselves.
-			if ( length < 3 )
-			{
-				console.log("layoutMeasure.measureFromPxString: string should contain a value followed by 'px'");
-			}
-			measureInPxString = measureInPxString.substr( 0, measureInPxString.length - 2 );
-			
-			if ( decimalPosition >= 0 )
-			{
-				fractionPart = measureInPxString.substring( decimalPosition + 1 );
-				while ( fractionPart.length < precision )
-				{
-					fractionPart += '0';
-				}
-				fractionPart = parseInt( fractionPart, 10 );
-			}
-			if ( decimalPosition !== 0 )
-			{
-				wholePart = measureInPxString.substring( 0, decimalPosition >= 0 ? decimalPosition : length );
-				wholePart = parseInt( wholePart, 10 ) * Math.pow( 10, precision );
-			}
-			return new LayoutMeasure( wholePart + fractionPart );
-		};
-	
-		this.measureFromStyleProperty = function ( style, propertyName )
-		{
-			return this.measureFromPxString( style.getPropertyValue( propertyName ) );
-		};
+		// Don't depend on a potentially lossy conversion to a float-- we'll parse it ourselves.
+		measureInPxString = measureInPxString.substr( 0, measureInPxString.length - 2 );
 		
-		this.zero = function()
+		if ( decimalPosition >= 0 )
 		{
-			return new LayoutMeasure(0);
-		};
-
-		this.min = function ( a, b )
+			fractionPart = measureInPxString.substring( decimalPosition + 1 );
+			while ( fractionPart.length < precision )
+			{
+				fractionPart += '0';
+			}
+			fractionPart = parseInt( fractionPart, 10 );
+		}
+		if ( decimalPosition !== 0 )
 		{
-			return new LayoutMeasure(Math.min(a.internalMeasure, b.internalMeasure));
-		};
-
-		this.max = function ( a, b )
-		{
-			return new LayoutMeasure(Math.max(a.internalMeasure, b.internalMeasure));
-		};
+			wholePart = measureInPxString.substring( 0, decimalPosition >= 0 ? decimalPosition : length );
+			wholePart = parseInt( wholePart, 10 ) * Math.pow( 10, precision );
+		}
+		return new LayoutMeasure( wholePart + fractionPart );
+	};
+	LayoutMeasure.measureFromStyleProperty = function ( el, property )
+	{
+		return this.measureFromPxString( getCSSValue( el, property ) );
+	};
+	LayoutMeasure.zero = function()
+	{
+		return new LayoutMeasure(0);
+	};
+	LayoutMeasure.min = function ( a, b )
+	{
+		return new LayoutMeasure(Math.min(a.internalMeasure, b.internalMeasure));
+	};
+	LayoutMeasure.max = function ( a, b )
+	{
+		return new LayoutMeasure(Math.max(a.internalMeasure, b.internalMeasure));
 	};
 	LayoutMeasure.prototype.getRawMeasure = function()
 	{
@@ -2911,8 +2885,8 @@ Note:						If you change or improve on this script, please let us know by
 		}
 		else
 		{
-			internalMeasureString = this.internalMeasure + '';
-			wholePixelString = internalMeasureString.substr(0, internalMeasureString.length - 2);
+			internalMeasureString	= this.internalMeasure + '';
+			wholePixelString		= internalMeasureString.substr( 0, internalMeasureString.length - precision );
 		}
 		fractionOfPixel = Math.abs(this.internalMeasure % Math.pow(10, precision));
 		if ( fractionOfPixel == 0 )
@@ -2961,7 +2935,7 @@ Note:						If you change or improve on this script, please let us know by
 	};
 	LayoutMeasure.prototype.add = function( measure )
 	{
-		if ( ! ( measure instanceof layoutMeasure ) )
+		if ( ! ( measure instanceof LayoutMeasure ) )
 		{
 			console.log("layoutMeasure.add only accepts layout measures");
 		}
@@ -2969,7 +2943,7 @@ Note:						If you change or improve on this script, please let us know by
 	};
 	LayoutMeasure.prototype.subtract = function( measure )
 	{
-		if ( ! ( measure instanceof layoutMeasure ) )
+		if ( ! ( measure instanceof LayoutMeasure ) )
 		{
 			console.log("layoutMeasure.subtract only accepts layout measures");
 		}
@@ -2995,7 +2969,7 @@ Note:						If you change or improve on this script, please let us know by
 	};
 	LayoutMeasure.prototype.equals = function( measure )
 	{
-		if ( ! ( measure instanceof layoutMeasure ) )
+		if ( ! ( measure instanceof LayoutMeasure ) )
 		{
 			console.log("layoutMeasure.equals only accepts layout measures");
 		}
