@@ -1,0 +1,25 @@
+*{margin:0px 0px 0px 0px;padding:0px 0px 0px 0px;}
+html{height:100%;}
+body{font-family:'Segoe UI',Verdana,Helvetica,Sans-Serif;font-size:10pt;height:100%;background-color:white;color:#424242;}
+p{padding:0px 0px 10pt 0px;}
+a{text-decoration:none;}
+a,a:visited,a:hover{color:#00a3ef;}
+a:hover,a:visited:hover{color:#00a3ef;text-decoration:underline;}
+body{position:relative;margin:0px auto 0px auto;min-width:960px;max-width:1080px;padding:0px 40px 0px 40px;}
+#DemoScreenreaderText{position:absolute;left:-10000px;}
+#DemoTitle{padding:20px 0px 0px 0px;font-size:24pt;font-weight:normal;color:#00a3ef;}
+#DemoIntroduction{margin:40px 0px 0px 0px;}
+#DemoContent{margin:30px 0px 0px 0px;}
+#DemoDetails{margin:30px 0px 0px 0px;}
+#demo{font-family:Helvetica,Arial,sans-serif;font-size:12px;line-height:16px;}
+header h1{font-size:52px;font-weight:bold;line-height:40px;border:1px dotted #444;}
+header h2{color:#444;font-size:12px;font-weight:normal;border:1px dotted #444;}
+header blockquote{text-indent:-0.8em;font-style:oblique;border:1px dotted #444;}
+header div,header nav{border:1px dotted #444;}
+header nav>p{margin-top:1em;}
+section h1{font-size:18px;font-weight:bold;}
+article h2{margin:0;font-size:16px;font-weight:bold;}
+article p{margin:0;}
+article time{font-weight:bold;}
+a{text-decoration:none;font-weight:bold;color:black;}
+a:hover{color:#ff5247;}
