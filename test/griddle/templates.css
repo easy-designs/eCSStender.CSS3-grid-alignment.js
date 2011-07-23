@@ -1,8 +1,8 @@
 ﻿.t-image-overlay-sm
 {
-	display: -ms-grid;
-	-ms-grid-columns: 1fr;
-	-ms-grid-rows: 1fr;
+	display: grid;
+	grid-columns: 1fr;
+	grid-rows: 1fr;
 	width: 186px;
 	height: 156px;
 	padding: 12px;
@@ -14,8 +14,8 @@
 
 .t-image-overlay-sm > img
 {
-	-ms-grid-row: 1;
-	-ms-grid-column: 1;
+	grid-row: 1;
+	grid-column: 1;
 	border: 1px solid #ddd;
 	width: 184px;
 	height: 154px;
@@ -23,12 +23,12 @@
 
 .t-image-overlay-sm  > .t-image-overlay-caption
 {
-	-ms-grid-row: 1;
-	-ms-grid-column: 1;
-	-ms-grid-row-align: end;
-	display: -ms-grid;
-	-ms-grid-columns: auto 1fr 1fr;
-	-ms-grid-rows: auto auto;
+	grid-row: 1;
+	grid-column: 1;
+	grid-row-align: end;
+	display: grid;
+	grid-columns: auto 1fr 1fr;
+	grid-rows: auto auto;
 	background-color: rgba(255, 255, 255, 0.8);
 	color: rgba(15, 25, 35, 1);
 	padding: 6px;
@@ -37,18 +37,18 @@
 
 .t-image-overlay-caption-title
 {
-	-ms-grid-column: 1;
-	-ms-grid-row: 1;
-	-ms-grid-column-span: 3;
+	grid-column: 1;
+	grid-row: 1;
+	grid-column-span: 3;
 	margin-bottom: 6px;
 	font-size: 14pt;
 }
 
 .t-image-overlay-caption-player-name
 {	
-	-ms-grid-column: 2;
-	-ms-grid-row: 2;
-	-ms-grid-row-align: end;
+	grid-column: 2;
+	grid-row: 2;
+	grid-row-align: end;
 	margin-left: 6px;
 }
 
@@ -62,20 +62,20 @@
 
 .t-image-overlay-caption > img
 {
-	-ms-grid-column: 1;
-	-ms-grid-row: 2;
+	grid-column: 1;
+	grid-row: 2;
 	width: 20px;
 	height: 20px;
 	
-	-ms-grid-row-align: end;
+	grid-row-align: end;
 }
 
 .t-image-overlay-caption-stats
 {
-	-ms-grid-column: 3;
-	-ms-grid-row: 2;
-	-ms-grid-column-align: end;
-	-ms-grid-row-align: end;
+	grid-column: 3;
+	grid-row: 2;
+	grid-column-align: end;
+	grid-row-align: end;
 	font-size: 10pt;
 	color: #777;
 	
@@ -89,9 +89,9 @@
 
 .t-hero-image-overlay
 {
-	display: -ms-grid;
-	-ms-grid-columns: 1fr;
-	-ms-grid-rows: 1fr;
+	display: grid;
+	grid-columns: 1fr;
+	grid-rows: 1fr;
 	background-color: #fff;
 	width: 100%;
 	height: 100%;
@@ -99,17 +99,17 @@
 
 .t-hero-image-overlay > img
 {
-	-ms-grid-row: 1;
-	-ms-grid-column: 1;
+	grid-row: 1;
+	grid-column: 1;
 	width: 400px;
 	height: 300px;
 }
 
 .t-hero-image-overlay-caption
 {
-	-ms-grid-row: 1;
-	-ms-grid-column: 1;
-	-ms-grid-row-align: end;
+	grid-row: 1;
+	grid-column: 1;
+	grid-row-align: end;
 	background-color: rgba(255, 255, 255, 0.8);
 	color: rgba(15, 25, 35, 1);
 	padding: 6px;
@@ -135,9 +135,9 @@
 
 .t-hero-image-overlay-message
 {
-	-ms-grid-row: 1;
-	-ms-grid-column: 1;
-	-ms-grid-row-align: start;
+	grid-row: 1;
+	grid-column: 1;
+	grid-row-align: start;
 	background-color: rgba(255, 255, 255, 0.8);
 	color: #555;
 	font-size: 10pt;
@@ -163,16 +163,16 @@
 
 .t-list-item-grid
 {
-	display: -ms-grid;
-	-ms-grid-columns: 72px 1fr;
-	-ms-grid-rows: auto 1fr;
+	display: grid;
+	grid-columns: 72px 1fr;
+	grid-rows: auto 1fr;
 }
 
 .t-list-item-icon
 {
-	-ms-grid-column: 1;
-	-ms-grid-row: 1;
-	-ms-grid-row-span: 2;
+	grid-column: 1;
+	grid-row: 1;
+	grid-row-span: 2;
 	height: 72px;
 	overflow: hidden;
 	border: 1px solid #ddd;
@@ -180,8 +180,8 @@
 
 .t-list-item-title
 {
-	-ms-grid-column: 2;
-	-ms-grid-row: 1;
+	grid-column: 2;
+	grid-row: 1;
 	padding-left: 6px;
 	font-size: 14pt;
 	overflow: hidden;
@@ -193,8 +193,8 @@
 
 .t-list-item-menu
 {
-	-ms-grid-column: 2;
-	-ms-grid-row: 2;
+	grid-column: 2;
+	grid-row: 2;
 	padding-left: 6px;
 	font-size: 10pt;
 	color: #777;
@@ -212,37 +212,37 @@
 
 .t-shot-details
 {
-	display: -ms-grid;
-	-ms-grid-columns: 1fr;
-	-ms-grid-rows: auto 1fr auto;
+	display: grid;
+	grid-columns: 1fr;
+	grid-rows: auto 1fr auto;
 	padding: 12px;
 	height: calc(100% - 24px);
 }
 
 .t-shot-details-header
 {
-	-ms-grid-column: 1;
-	-ms-grid-row: 1;
-	display: -ms-grid;
-	-ms-grid-columns: 96px 1fr;
-	-ms-grid-rows: auto auto;
+	grid-column: 1;
+	grid-row: 1;
+	display: grid;
+	grid-columns: 96px 1fr;
+	grid-rows: auto auto;
 	height: 96px;
 	margin-bottom: 12px;	
 }
 
 .t-shot-details-header-avatar
 {
-	-ms-grid-row: 1;
-	-ms-grid-columns: 1;
-	-ms-grid-row-span: 2;
+	grid-row: 1;
+	grid-columns: 1;
+	grid-row-span: 2;
 	width: 96px;
 	height: 96px;
 }
 
 .t-shot-details-header-title
 {
-	-ms-grid-column: 2;
-	-ms-grid-row: 1;
+	grid-column: 2;
+	grid-row: 1;
 	font-size: 24pt;
 	padding: 12px;
 	overflow: hidden;
@@ -252,23 +252,23 @@
 
 .t-shot-details-header-player-name
 {
-	-ms-grid-row: 2;
-	-ms-grid-column: 2;
+	grid-row: 2;
+	grid-column: 2;
 	padding: 12px;
 }
 
 .t-shot-details-img
 {
-	-ms-grid-column: 1;
-	-ms-grid-row: 2;
+	grid-column: 1;
+	grid-row: 2;
 	overflow: hidden;
 	margin-bottom: 12px;
 }
 
 .t-shot-details-stats
 {
-	-ms-grid-column: 1;
-	-ms-grid-row: 3;
+	grid-column: 1;
+	grid-row: 3;
 	display: -ms-box;
 	-ms-box-align: middle;
 	-ms-box-pack: justify;
@@ -285,30 +285,30 @@
 
 	.t-list-item-grid
 	{
-		display: -ms-grid;
-		-ms-grid-columns: 72px 1fr;
-		-ms-grid-rows: auto 1fr;
+		display: grid;
+		grid-columns: 72px 1fr;
+		grid-rows: auto 1fr;
 	}
 
 	.t-list-item-icon
 	{
-		-ms-grid-column: 1;
-		-ms-grid-row: 1;
-		-ms-grid-row-span: 2;
+		grid-column: 1;
+		grid-row: 1;
+		grid-row-span: 2;
 		height: 72px;
 		overflow: hidden;
 	}
 
 	.t-list-item-title
 	{
-		-ms-grid-column: 2;
-		-ms-grid-row: 1;
+		grid-column: 2;
+		grid-row: 1;
 	}
 
 	.t-list-item-menu
 	{
-		-ms-grid-column: 2;
-		-ms-grid-row: 2;
+		grid-column: 2;
+		grid-row: 2;
 	}
 	.t-image-overlay > .t-image-overlay-caption > .t-image-overlay-caption-title
 	{
@@ -328,16 +328,16 @@
 
 	.t-list-item-grid
 	{
-		display: -ms-grid;
-		-ms-grid-columns: 50px 1fr;
-		-ms-grid-rows: auto 1fr;
+		display: grid;
+		grid-columns: 50px 1fr;
+		grid-rows: auto 1fr;
 	}
 	
 	.t-list-item-title
 	{
-		-ms-grid-column: 2;
-		-ms-grid-row: 1;
-		-ms-grid-row-align: start;
+		grid-column: 2;
+		grid-row: 1;
+		grid-row-align: start;
 		padding-left: 6px;
 		font-size: 11pt;
 		overflow: hidden;
@@ -348,17 +348,17 @@
 
 	.t-list-item-icon
 	{
-		-ms-grid-column: 1;
-		-ms-grid-row: 1;
-		-ms-grid-row-span: 2;
+		grid-column: 1;
+		grid-row: 1;
+		grid-row-span: 2;
 		height: 50px;
 		overflow: hidden;
 	}
 
 	.t-list-item-menu
 	{
-		-ms-grid-column: 2;
-		-ms-grid-row: 2;
+		grid-column: 2;
+		grid-row: 2;
 		display: -ms-box;
 		-ms-box-orient: horizontal;
 		-ms-box-lines: multiple;
