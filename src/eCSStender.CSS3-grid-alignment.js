@@ -293,16 +293,16 @@ Note:						If you change or improve on this script, please let us know by
 		gridCols	= this.properties['grid-columns'] || 'none',
 		gridRows	= this.properties['grid-rows'] || 'none';
 
-		console.log('laying out');
+		// console.log('laying out');
 
 		// Get the available space for the grid since it is required
 		// for determining track sizes for auto/fit-content/minmax 
 		// and fractional tracks.
 		this.determineGridAvailableSpace();
 
-		console.log( "Grid element content available space: columns = " + 
-					 this.availableSpaceForColumns.getPixelValueString() + "; rows = " +
-					 this.availableSpaceForRows.getPixelValueString() );
+		// console.log( "Grid element content available space: columns = " + 
+		//			 this.availableSpaceForColumns.getPixelValueString() + "; rows = " +
+		//			 this.availableSpaceForRows.getPixelValueString() );
         
 		GridTest.propertyParser.parseGridTracksString( gridCols, this.columnTrackManager );
 		GridTest.propertyParser.parseGridTracksString( gridRows, this.rowTrackManager );
@@ -317,13 +317,13 @@ Note:						If you change or improve on this script, please let us know by
         
 		//this.verifyGridItemSizes();
 		//this.verifyGridItemPositions(gridObject);
-        console.log(this);
+        // console.log(this);
 		this.layout();
 		//return ! this.error;
 	};
 	Grid.prototype.layout = function()
 	{
-		console.log('laying out now');
+		// console.log('laying out now');
 		var
 		items		= this.items,
 		i			= items.length,
@@ -342,18 +342,18 @@ Note:						If you change or improve on this script, please let us know by
 			item		= items[i];
 			details		= item.styles;
 			newclass	= e.makeUniqueClass();
-			//e.addClass( item.itemElement, newclass );
+			e.addClass( item.itemElement, newclass );
 			position	= this.getPosition( item );
-			dimensions	= item.shrinkToFitSize;
-			styles += details.selector /*+ '.' + newclass*/ + '{position: absolute;';
+			dimensions	= this.getDimensions( item );
+			styles += details.selector + '.' + newclass + '{position: absolute;';
 			styles += 'top:' + position.top + ';';
 			styles += 'left:' + position.left + ';';
-			styles += 'width:' + dimensions.width.internalMeasure + 'px;';
-			styles += 'height:' + dimensions.height.internalMeasure + 'px;';
+			styles += 'width:' + dimensions.width + 'px;';
+			styles += 'height:' + dimensions.height + 'px;';
 			styles += '}';
 		}
 				
-		console.log(getCSSValue( this.gridElement, 'position' ));
+		// console.log(getCSSValue( this.gridElement, 'position' ));
 		if ( getCSSValue( this.gridElement, 'position' ) == 'static' )
 		{
 			gridstyles += 'position: relative;';
@@ -381,36 +381,52 @@ Note:						If you change or improve on this script, please let us know by
 			styles += this.selector + '{' + gridstyles + '}';
 		}
 		
-		console.log(styles);
+		// console.log(styles);
 		e.embedCSS( styles, this.media );
 	};
 	Grid.prototype.getPosition = function( item )
 	{
 		var
-		col	= item.column,
-		row	= item.row,
+		col	= item.column - 1,
+		row	= item.row - 1,
 		pos	= {
 			top:	0,
 			left:	0
 		};
-		console.log( col );
-		console.log( row );
-		while ( --col )
+		while ( col-- )
 		{
-			console.log( 'adding width of column ' + col );
-			console.log( 'adding ' + this.columnTrackManager.tracks[col].measure.internalMeasure );
 			pos.left += this.columnTrackManager.tracks[col].measure.internalMeasure;
 		}
-		while ( --row )
+		while ( row-- )
 		{
-			console.log( 'adding height of row ' + row );
-			console.log( 'adding ' + this.columnTrackManager.tracks[row].measure.internalMeasure );
 			pos.top += this.rowTrackManager.tracks[row].measure.internalMeasure;
 		}
 		
 		pos.left += 'px';
 		pos.top += 'px';
 		return pos;
+	};
+	Grid.prototype.getDimensions = function( item )
+	{
+		var
+		dimensions	= item.shrinkToFitSize,
+		element		= item.itemElement,
+		margins = {}, padding = {}, borders = {},
+		sides		= ['top','right','bottom','left'],
+		s			= sides.length;
+		dimensions	= {
+			height:	dimensions.height.internalMeasure,
+			width:	dimensions.width.internalMeasure
+		};
+		while ( s-- )
+		{
+			margins[sides[s]] = parseInt( getCSSValue( element, 'margin-' + sides[s] ), 10 );
+			padding[sides[s]] = parseInt( getCSSValue( element, 'padding-' + sides[s] ), 10 );
+			borders[sides[s]] = parseInt( getCSSValue( element, 'border-' + sides[s] + '-width' ), 10 );
+		}
+		dimensions.height -= ( margins.top + margins.bottom + padding.top + padding.bottom + borders.top + borders.bottom );
+		dimensions.width -= ( margins.left + margins.right + padding.left + padding.right + borders.left + borders.right );
+		return dimensions;
 	};
 	/* Determines the available space for the grid by:
 	 * 1. Swapping in a dummy block|inline-block element where the grid 
@@ -427,13 +443,14 @@ Note:						If you change or improve on this script, please let us know by
 	{
 		var
 		gridElement			= this.gridElement,
+		dummy				= gridElement.cloneNode(),
 		gridProperties		= this.properties,
 		gridElementParent	= gridElement.parentNode,
 		isInlineGrid,
 		sides	= ['top','right','bottom','left'],
 		s		= sides.length,
 		margins = {}, padding = {}, borders = {}, innerHTML, width, height,
-		dummy, widthToUse, heightToUse, marginToUse, borderWidthToUse, borderStyleToUse, paddingToUse,
+		widthToUse, heightToUse, marginToUse, borderWidthToUse, borderStyleToUse, paddingToUse,
 		cssText, scrollWidth, scrollHeight, removedElement,
 		widthAdjustment, heightAdjustment, widthMeasure, heightMeasure, widthAdjustmentMeasure, heightAdjustmentMeasure;
         
@@ -454,23 +471,23 @@ Note:						If you change or improve on this script, please let us know by
 		// in that case, we are a block element and take up all available width.
 		// TODO: ensure we do the right thing for floats.
 		// need to remove the content to ensure we get the right height
-		innerHTML = gridElement.innerHTML;
-		gridElement.innerHTML = '';
-		width = getCSSValue( gridElement, 'width' );
+		dummy.innerHTML = '';
+		gridElementParent.insertBefore( dummy, gridElement );
+		width = getCSSValue( dummy, 'width' );
 		if ( width == '0px' ){ width = 'auto'; }
 		if ( width == "auto" &&
 		 	 ( isInlineGrid || getCSSValue( gridElement, 'float' ) !== "none" ) )
 		{
 			this.useAlternateFractionalSizingForColumns = TRUE;
 		}
-		height = getCSSValue( gridElement, 'height' );
+		height = getCSSValue( dummy, 'height' );
 		if ( height == '0px' ){ height = 'auto'; }
 		if ( height == "auto" )
 		{
 			this.useAlternateFractionalSizingForRows = TRUE;
 		}
-		// replace the content
-		gridElement.innerHTML = innerHTML;
+		// remove the dummy
+		gridElementParent.removeChild( dummy );
         
 		// build the straw man for getting dimensions
 		dummy = document.createElement( gridElement.tagName );
@@ -544,7 +561,7 @@ Note:						If you change or improve on this script, please let us know by
 		size  -= ( margins[one] + margins[two] );
 		size  -= ( borders[one] + borders[two] );
 		size  -= ( padding[one] + padding[two] );
-		console.log('size: ' +size);
+		// console.log('size: ' +size);
 		return size;
 	};
 	Grid.prototype.verticalScrollbarWidth = function()
@@ -572,7 +589,7 @@ Note:						If you change or improve on this script, please let us know by
 			if ( isNaN(column) )
 			{
 				this.error = TRUE;
-				console.log("column is NaN");
+				// console.log("column is NaN");
 				column = 1;
 			}
 
@@ -580,7 +597,7 @@ Note:						If you change or improve on this script, please let us know by
 			if ( isNaN(columnSpan) )
 			{
 				this.error = TRUE;
-				console.log("column-span is NaN");
+				// console.log("column-span is NaN");
 				columnSpan = 1;
 			}
 			
@@ -588,7 +605,7 @@ Note:						If you change or improve on this script, please let us know by
 			if ( isNaN(row) )
 			{
 				this.error = TRUE;
-				console.log("row is NaN");
+				// console.log("row is NaN");
 				row = 1;
 			}
 			
@@ -596,7 +613,7 @@ Note:						If you change or improve on this script, please let us know by
 			if ( isNaN(rowSpan) )
 			{
 				this.error = TRUE;
-				console.log("row-span is NaN");
+				// console.log("row-span is NaN");
 				rowSpan = 1;
 			}
 
@@ -604,7 +621,7 @@ Note:						If you change or improve on this script, please let us know by
 			if ( columnAlignString.length === 0 )
 			{
 				this.error = TRUE;
-				console.log("getPropertyValue for " + GRIDCOLUMNALIGN + " is an empty string");
+				// console.log("getPropertyValue for " + GRIDCOLUMNALIGN + " is an empty string");
 			}
 			columnAlign = this.gridAlignStringToEnum(columnAlignString);
 
@@ -612,7 +629,7 @@ Note:						If you change or improve on this script, please let us know by
 			if ( rowAlignString.length === 0 )
 			{
 				this.error = TRUE;
-				console.log("getPropertyValue for " + GRIDROWALIGN + " is an empty string");
+				// console.log("getPropertyValue for " + GRIDROWALIGN + " is an empty string");
 			}
 			rowAlign = this.gridAlignStringToEnum(rowAlignString);
 
@@ -662,7 +679,7 @@ Note:						If you change or improve on this script, please let us know by
 			case "":
 				return gridAlignEnum.stretch;
 			default:
-				console.log("unknown grid align string: " + alignString);
+				// console.log("unknown grid align string: " + alignString);
 		}
 	};
 	Grid.prototype.positionStringToEnum = function ( positionString )
@@ -681,7 +698,7 @@ Note:						If you change or improve on this script, please let us know by
 			case "":
 				return positionEnum['static'];
 			default:
-				console.log("unknown position string: " + positionString);
+				// console.log("unknown position string: " + positionString);
 		}
 	};
 	Grid.prototype.blockProgressionStringToEnum = function (positionString)
@@ -700,7 +717,7 @@ Note:						If you change or improve on this script, please let us know by
 			case blockProgressionEnum.rl.keyword:
 				return blockProgressionEnum.rl;
 			default:
-				console.log("unknown block-progression string: " + positionString);
+				// console.log("unknown block-progression string: " + positionString);
 		}
 	};
 	Grid.prototype.gridTrackValueStringToEnum = function (trackValueString)
@@ -716,7 +733,7 @@ Note:						If you change or improve on this script, please let us know by
 			case gridTrackValueEnum.fitContent.keyword:
 				return gridTrackValueEnum.fitContent;
 			default:
-				console.log("unknown grid track string: " + trackValueString);
+				// console.log("unknown grid track string: " + trackValueString);
 		}
 	};
 	// Creates track objects for implicit tracks if needed.
@@ -765,7 +782,7 @@ Note:						If you change or improve on this script, please let us know by
 	};
 	Grid.prototype.saveItemPositioningTypes = function()
 	{
-		console.log('saving positioning types');
+		// console.log('saving positioning types');
 		var
 		items	= this.items,
 		i		= items.length;
@@ -819,7 +836,7 @@ Note:						If you change or improve on this script, please let us know by
 			if ( curTrack.sizingType !== sizingTypeEnum.keyword &&
 				 curTrack.sizingType !== sizingTypeEnum.valueAndUnit )
 			{
-				 console.log("Unknown grid track sizing type");
+				 // console.log("Unknown grid track sizing type");
 			}
             
 			// TODO: add support for minmax (M3)
@@ -839,7 +856,7 @@ Note:						If you change or improve on this script, please let us know by
 					 curSize !== gridTrackValueEnum.auto &&
 					 ! sizingAlternateFraction )
 				{
-					console.log("Unknown grid track sizing value " + curSize.keyword);
+					// console.log("Unknown grid track sizing value " + curSize.keyword);
 				}
 				if ( ! sizingAlternateFraction )
 				{
@@ -940,7 +957,7 @@ Note:						If you change or improve on this script, please let us know by
 				 * To ensure we match the layout engine's rounded result, we will get the actual track length
 				 * and compare against our calculated length. If it is within 1px, we will assume that it is correct.
 				 **/
-				console.log( 'dealing with content-sized tracks now' );
+				// console.log( 'dealing with content-sized tracks now' );
 				switch ( curSize )
 				{
 					case gridTrackValueEnum.maxContent:
@@ -948,10 +965,10 @@ Note:						If you change or improve on this script, please let us know by
 						if ( actualMeasure.equals( curTrack.maxMeasure ) !== TRUE )
 						{
 							// Not an error; we will catch the problem later when we verify grid items.
-							console.log( (computingColumns ? "Column" : "Row") + " " + curTrack.number + 
-										 ": " + "max-content length difference detected; expected = " +
-										 curTrack.maxMeasure.getPixelValueString() + ", actual = " +
-										 actualMeasure.getPixelValueString() );
+							// console.log( (computingColumns ? "Column" : "Row") + " " + curTrack.number + 
+							//			 ": " + "max-content length difference detected; expected = " +
+							//			 curTrack.maxMeasure.getPixelValueString() + ", actual = " +
+							//			 actualMeasure.getPixelValueString() );
 						}
 						curTrack.measure = curTrack.minMeasure = curTrack.maxMeasure;
 						break;
@@ -960,10 +977,10 @@ Note:						If you change or improve on this script, please let us know by
 						if ( actualMeasure.equals( curTrack.minMeasure ) !== TRUE )
 						{
 							// Not an error; we will catch the problem later when we verify grid items.
-							console.log( (computingColumns ? "Column" : "Row") + " " + curTrack.number + 
-							 			 ": " + "min-content length difference detected; expected = " +
-							 			 curTrack.minMeasure.getPixelValueString() + ", actual = " +
-							 			 actualMeasure.getPixelValueString() );
+							// console.log( (computingColumns ? "Column" : "Row") + " " + curTrack.number + 
+							// 			 ": " + "min-content length difference detected; expected = " +
+							// 			 curTrack.minMeasure.getPixelValueString() + ", actual = " +
+							// 			 actualMeasure.getPixelValueString() );
 						}
 						curTrack.measure = curTrack.maxMeasure = curTrack.minMeasure;
 						break;
@@ -998,7 +1015,7 @@ Note:						If you change or improve on this script, please let us know by
 				{
 					// Track lengths are assumed to always be in pixels or fractions. Convert before going into this function.
 					this.error = TRUE;
-					console.log("track size not converted into px!");
+					// console.log("track size not converted into px!");
 					// TODO: throw after we start doing conversions and don't want to ignore this anymore.
 				}
 			}
@@ -1078,7 +1095,7 @@ Note:						If you change or improve on this script, please let us know by
 			if ( ! useAlternateFractionalSizing ||
 				 respectAvailableLength )
 			{
-				console.log("remaining space for fractional sizing = " + remainingSpace.getPixelValueString());
+				// console.log("remaining space for fractional sizing = " + remainingSpace.getPixelValueString());
 			}
 			fractionalTracks.sort(this.compareFractionTracksNormalMeasure);
 			sumOfFractions = 0;
@@ -1290,7 +1307,7 @@ Note:						If you change or improve on this script, please let us know by
 	//			// If we are one layout pixel off, just pick up what the actual value is and consider it close enough.
 	//			if ( Math.abs( tracks[i].measure.subtract(actualMeasure).getRawMeasure() ) <= 1 )
 	//			{
-	//				console.log( (computingColumns ? "Column" : "Row") + " " + tracks[i].number + ": " +
+	//				// console.log( (computingColumns ? "Column" : "Row") + " " + tracks[i].number + ": " +
 	//							 "adjusting for track length difference; expected = " + 
 	//							 tracks[i].measure.getPixelValueString() + ", actual = " + 
 	//							 actualMeasure.getPixelValueString() );
@@ -1300,7 +1317,7 @@ Note:						If you change or improve on this script, please let us know by
 	//			else
 	//			{
 	//				// Not an error; we will catch the problem later when we verify grid items.
-	//				console.log( (computingColumns ? "Column" : "Row") + " " + tracks[i].number + ": " +
+	//				// console.log( (computingColumns ? "Column" : "Row") + " " + tracks[i].number + ": " +
 	//							 "track length difference > 1 layout pixel; expected = " + 
 	//							 tracks[i].measure.getPixelValueString() + ", actual = " +
 	//							 actualMeasure.getPixelValueString() );
@@ -1313,7 +1330,7 @@ Note:						If you change or improve on this script, please let us know by
 	{
 		if ( ! this.trackIsFractionSized( track ) )
 		{
-			console.log("getNormalFractionMeasure called for non-fraction sized track");
+			// console.log("getNormalFractionMeasure called for non-fraction sized track");
 		}
 		var frValue = track.size.value;
 		return frValue === 0 ? LayoutMeasure.zero() : track.measure.divide(frValue);
@@ -1444,12 +1461,12 @@ Note:						If you change or improve on this script, please let us know by
 		if ( verifyingColumnBreadths &&
 			 ! verifyingPhysicalWidths )
 		{
-			console.log("Column breadths are heights due to block-progression value '" + blockProgression.keyword + "'");
+			// console.log("Column breadths are heights due to block-progression value '" + blockProgression.keyword + "'");
 		}
 		else if ( ! verifyingColumnBreadths &&
 					verifyingPhysicalWidths )
 		{
-			console.log("Row breadths are widths due to block-progression value '" + blockProgression.keyword + "'");
+			// console.log("Row breadths are widths due to block-progression value '" + blockProgression.keyword + "'");
 		}
 
 		while ( i-- )
@@ -1461,8 +1478,8 @@ Note:						If you change or improve on this script, please let us know by
 			{
 				trackNum		= verifyingColumnBreadths ? curItem.column : curItem.row;
 				alignType		= verifyingColumnBreadths ? curItem.columnAlign : curItem.rowAlign;
-				console.log(curItemElement.parentNode);
-				console.log(getCSSValue(curItemElement,'width'));
+				// console.log(curItemElement.parentNode);
+				// console.log(getCSSValue(curItemElement,'width'));
 				actualMeasure	= BoxSizeCalculator['calcMarginBox'+dimension]( curItemElement );
 
 				itemId = "";
@@ -1477,12 +1494,12 @@ Note:						If you change or improve on this script, please let us know by
 				if ( actualMeasure.getMeasureRoundedToWholePixel().equals(offsetMeasure) !== TRUE )
 				{
 					this.error = TRUE;
-					console.log( itemId + (verifyingColumnBreadths ? "column" : "row") + " " + 
-								 trackNum + ", item " + i + ": " +
-								 "offset length doesn't agree with calculated margin box length (" +
-								 ( verifyingPhysicalWidths ? "offsetWidth" : "offsetHeight" ) +
-								 ": " + offsetMeasure.getPixelValueString() + "; expected (unrounded): " +
-								 actualMeasure.getPixelValueString() );
+					// console.log( itemId + (verifyingColumnBreadths ? "column" : "row") + " " + 
+					//			 trackNum + ", item " + i + ": " +
+					//			 "offset length doesn't agree with calculated margin box length (" +
+					//			 ( verifyingPhysicalWidths ? "offsetWidth" : "offsetHeight" ) +
+					//			 ": " + offsetMeasure.getPixelValueString() + "; expected (unrounded): " +
+					//			 actualMeasure.getPixelValueString() );
 				}
 
 
@@ -1491,7 +1508,7 @@ Note:						If you change or improve on this script, please let us know by
 					// Use shrink-to-fit sizes.
 					if ( curItem.shrinkToFitSize === NULL )
 					{
-						console.log("Current item's shrink to fit size has not been calculated");
+						// console.log("Current item's shrink to fit size has not been calculated");
 					}
 					expectedMeasure = (verifyingPhysicalWidths ? curItem.shrinkToFitSize.width : curItem.shrinkToFitSize.height);
 				}
@@ -1511,14 +1528,14 @@ Note:						If you change or improve on this script, please let us know by
 							// Item uses its shrink-to-fit size.
 							if (curItem.shrinkToFitSize === NULL)
 							{
-								console.log("Current item's shrink to fit size has not been calculated");
+								// console.log("Current item's shrink to fit size has not been calculated");
 							}
 							// shrinkToFitSize is physical
 							expectedMeasure = ( verifyingPhysicalWidths ? curItem.shrinkToFitSize.width
 																		: curItem.shrinkToFitSize.height );
 							break;
 						default:
-							console.log("Unknown grid align type " + alignType.keyword);
+							// console.log("Unknown grid align type " + alignType.keyword);
 					}
 				}
 
@@ -1528,25 +1545,25 @@ Note:						If you change or improve on this script, please let us know by
 					// by just one layout pixel (1/100th of a pixel for IE), it's close enough.
 					if ( precision > 0 && Math.abs(expectedMeasure.subtract(actualMeasure).getRawMeasure()) === 1)
 					{
-						console.log( itemId + (verifyingColumnBreadths ? "column" : "row") + " " + trackNum + ": " +
-									 "sizing check passed after adjustment for fuzzy error checking (alignment: " + 
-									 alignType.keyword + "; expected: " + expectedMeasure.getPixelValueString() + 
-									 "; actual: " + actualMeasure.getPixelValueString() + ")" );
+						// console.log( itemId + (verifyingColumnBreadths ? "column" : "row") + " " + trackNum + ": " +
+						//			 "sizing check passed after adjustment for fuzzy error checking (alignment: " + 
+						//			 alignType.keyword + "; expected: " + expectedMeasure.getPixelValueString() + 
+						//			 "; actual: " + actualMeasure.getPixelValueString() + ")" );
 					}
 					else
 					{
 						this.error = TRUE;
-						console.log( itemId + (verifyingColumnBreadths ? "column" : "row") + " " + trackNum + ": " +
-									 "sizing check failed (alignment: " + alignType.keyword + "; expected: " +
-									 expectedMeasure.getPixelValueString() + "; actual: " + 
-									 actualMeasure.getPixelValueString() + ")" );
+						// console.log( itemId + (verifyingColumnBreadths ? "column" : "row") + " " + trackNum + ": " +
+						//			 "sizing check failed (alignment: " + alignType.keyword + "; expected: " +
+						//			 expectedMeasure.getPixelValueString() + "; actual: " + 
+						//			 actualMeasure.getPixelValueString() + ")" );
 					}
 				}
 				else
 				{
-					console.log( itemId + (verifyingColumnBreadths ? "column" : "row") + " " + trackNum + ": " +
-								 "sizing check passed (alignment: " + alignType.keyword + "; expected: " +
-								 expectedMeasure.getPixelValueString() + "; actual: " + actualMeasure.getPixelValueString() + ")" );
+					// console.log( itemId + (verifyingColumnBreadths ? "column" : "row") + " " + trackNum + ": " +
+					//			 "sizing check passed (alignment: " + alignType.keyword + "; expected: " +
+					//			 expectedMeasure.getPixelValueString() + "; actual: " + actualMeasure.getPixelValueString() + ")" );
 				}
 
 				if ( verifyingColumnBreadths )
@@ -1560,7 +1577,7 @@ Note:						If you change or improve on this script, please let us know by
 			}
 			else
 			{
-				console.log( itemId + ": already verified " + (verifyingColumnBreadths ? "column" : "row") + " breadth" );
+				// console.log( itemId + ": already verified " + (verifyingColumnBreadths ? "column" : "row") + " breadth" );
 			}
 		}
 	};
@@ -1624,8 +1641,8 @@ Note:						If you change or improve on this script, please let us know by
 	var BoxSizeCalculator = {
 		calcMarginBoxWidth: function( element )
 		{
-			console.log('element',element);
-			console.log('marginBoxWidth',"'"+getCSSValue( element, 'width')+"'");
+			// console.log('element',element);
+			// console.log('marginBoxWidth',"'"+getCSSValue( element, 'width')+"'");
 			var
 			boxSizing		= getCSSValue( element, BOXSIZING ),
 			marginBoxWidth	= LayoutMeasure.measureFromStyleProperty( element, "width" );
@@ -1805,7 +1822,7 @@ Note:						If you change or improve on this script, please let us know by
 							cssText += "width: " + this.infiniteLength.cssText;
 							break;
 						case calculatorOperationEnum.shrinkToFit:
-							console.log("Calculating shrink to fit size without specified container width");
+							// console.log("Calculating shrink to fit size without specified container width");
 							break;
 					}
 				}
@@ -1827,7 +1844,7 @@ Note:						If you change or improve on this script, please let us know by
 							cssText += "; height: " + this.zeroLength.cssText;
 							break;
 						case calculatorOperationEnum.shrinkToFit:
-							console.log("Calculating shrink to fit size without specified container height");
+							// console.log("Calculating shrink to fit size without specified container height");
 							break;
 					}
 				}
@@ -1900,7 +1917,7 @@ Note:						If you change or improve on this script, please let us know by
 				if ( typeof usedWidth === "undefined" ||
 					 usedWidth === NULL )
 				{
-					console.log("calcMinHeight: no usedWidth specified");
+					// console.log("calcMinHeight: no usedWidth specified");
 				}
 			
 				this.prepare( element, calculatorOperationEnum.minHeight, usedWidth );
@@ -1919,7 +1936,7 @@ Note:						If you change or improve on this script, please let us know by
 				if ( typeof usedWidth === "undefined" ||
 					 usedWidth === NULL )
 				{
-					console.log("calcMaxHeight: no usedWidth specified");
+					// console.log("calcMaxHeight: no usedWidth specified");
 				}
 			
 				this.prepare(element, calculatorOperationEnum.maxHeight, usedWidth);
@@ -1992,9 +2009,9 @@ Note:						If you change or improve on this script, please let us know by
 				// and fractional tracks.
 				this.determineGridAvailableSpace( gridObject );
 
-				console.log("Grid element content available space: columns = " + 
-							gridObject.availableSpaceForColumns.getPixelValueString() + "; rows = " +
-							gridObject.availableSpaceForRows.getPixelValueString());
+				// console.log("Grid element content available space: columns = " + 
+				//			gridObject.availableSpaceForColumns.getPixelValueString() + "; rows = " +
+				//			gridObject.availableSpaceForRows.getPixelValueString());
 
 				GridTest.propertyParser.parseGridTracksString(gridColumnsDefinition, gridObject.columnTrackManager);
 				GridTest.propertyParser.parseGridTracksString(gridRowsDefinition, gridObject.rowTrackManager);
@@ -2102,7 +2119,7 @@ Note:						If you change or improve on this script, please let us know by
 					}
 					trackInfoString = "track[" + trackRange + "] = " + curTrack.measure.getPixelValueString() + "px";
 
-					console.log(trackInfoString);
+					// console.log(trackInfoString);
 
 					curTrack = trackIter.next();
 				}
@@ -2265,7 +2282,7 @@ Note:						If you change or improve on this script, please let us know by
 
 				if (containingElement !== itemElement.offsetParent)
 				{
-					console.log("Absolute position grid item has wrong offsetParent");
+					// console.log("Absolute position grid item has wrong offsetParent");
 				}
 				if ( itemUsedStyle.getPropertyValue("left") === "auto" &&
 					 itemUsedStyle.getPropertyValue("right") === "auto" )
@@ -2302,7 +2319,7 @@ Note:						If you change or improve on this script, please let us know by
 				
 				if ( containingElement !== itemElement.offsetParent )
 				{
-					console.log("Absolute position grid item has wrong offsetParent");
+					// console.log("Absolute position grid item has wrong offsetParent");
 				}
 				if ( itemUsedStyle.getPropertyValue("top") === "auto" &&
 					 itemUsedStyle.getPropertyValue("bottom") === "auto" )
@@ -2349,7 +2366,7 @@ Note:						If you change or improve on this script, please let us know by
 
 				if (curElement !== gridElement && curElement !== gridElement.offsetParent)
 				{
-					console.log("offsetParent doesn't agree with calculated containing block");
+					// console.log("offsetParent doesn't agree with calculated containing block");
 				}
 				return curElement;
 			},
@@ -2444,14 +2461,14 @@ Note:						If you change or improve on this script, please let us know by
 								case positionEnum.fixed:
 									if ( curItem.itemElement.offsetParent !== this.getContainingBlockElementForStaticPositionedGridItems() )
 									{
-										console.log("Fixed position grid item has wrong offsetParent");
+										// console.log("Fixed position grid item has wrong offsetParent");
 									}
 									itemOffset = verifyingHorizontalOffsets ?
 												 LayoutMeasure.measureFromPx(curItem.itemElement.offsetLeft) :
 												 LayoutMeasure.measureFromPx(curItem.itemElement.offsetTop);
 									break;
 								default:
-									console.log("Unknown position type " + curItem.position.keyword);
+									// console.log("Unknown position type " + curItem.position.keyword);
 							}
 
 							itemId = "";
@@ -2493,7 +2510,7 @@ Note:						If you change or improve on this script, please let us know by
 															.add( spannedTrackMeasure.subtract(actualMeasure).divide(2) );
 										break;
 									default:
-										console.log("Unknown grid align type " + alignType.keyword);
+										// console.log("Unknown grid align type " + alignType.keyword);
 								}
 							}
 
@@ -2529,7 +2546,7 @@ Note:						If you change or improve on this script, please let us know by
 										 * we need to figure out our parent's box size, subtract the value for the
 										 * right property from that, and then subtract the size of our box. 
 										 **/
-										console.log("Not implemented: verification of absolute positioned items with 'right' specified and 'left' auto.");
+										// console.log("Not implemented: verification of absolute positioned items with 'right' specified and 'left' auto.");
 									}
 								}
 								else
@@ -2542,7 +2559,7 @@ Note:						If you change or improve on this script, please let us know by
 									else if ( curGridItemUsedStyle.getPropertyValue("bottom") !== "auto" )
 									{
 										// See note above about why we didn't implement this (it's extra work).
-										console.log("Not implemented: verification of absolute positioned items with 'bottom' specified and 'top' auto.");
+										// console.log("Not implemented: verification of absolute positioned items with 'bottom' specified and 'top' auto.");
 									}
 								}
 							}
@@ -2565,11 +2582,11 @@ Note:						If you change or improve on this script, please let us know by
 									 Math.abs(expectedPosition.getRawMeasure() - itemOffset.getRawMeasure()) % (
 										5 * Math.pow(10, precision-1) ) <= 1 )
 								{
-									console.log( itemId + (verifyingColumnPositions ? "column" : "row") +
-												 " " + trackNum + ": " + verificationWord +
-												 " position check passed for center aligned item after adjustment (alignment: " +
-												 alignType.keyword + "; expected (unrounded): " + expectedPosition.getPixelValueString() +
-												 "; actual: " + itemOffset.getPixelValueString() + ")" );
+									// console.log( itemId + (verifyingColumnPositions ? "column" : "row") +
+									//			 " " + trackNum + ": " + verificationWord +
+									//			 " position check passed for center aligned item after adjustment (alignment: " +
+									//			 alignType.keyword + "; expected (unrounded): " + expectedPosition.getPixelValueString() +
+									//			 "; actual: " + itemOffset.getPixelValueString() + ")" );
 								}
 								 // Check if offset rounding errors may have caused an allowable difference.
 								else if (
@@ -2585,27 +2602,27 @@ Note:						If you change or improve on this script, please let us know by
 									Math.abs(expectedPosition.getRawMeasure() - itemOffset.getRawMeasure()) < 
 										Math.pow(10, precision) )
 								{
-									console.log( itemId + (verifyingColumnPositions ? "column" : "row") + " " + trackNum +
-									 			 ": " + verificationWord +
-												 " position check passed for non-stretch/non-end aligned reversed offset item after adjustment (alignment: " +
-												 alignType.keyword + "; expected (unrounded): " + expectedPosition.getPixelValueString() + 
-												 "; actual: " + itemOffset.getPixelValueString() + ")" );
+									// console.log( itemId + (verifyingColumnPositions ? "column" : "row") + " " + trackNum +
+									// 			 ": " + verificationWord +
+									//			 " position check passed for non-stretch/non-end aligned reversed offset item after adjustment (alignment: " +
+									//			 alignType.keyword + "; expected (unrounded): " + expectedPosition.getPixelValueString() + 
+									//			 "; actual: " + itemOffset.getPixelValueString() + ")" );
 								}
 								else
 								{
 									this.error = TRUE;
-									console.log( itemId + (verifyingColumnPositions ? "column" : "row") + " " + trackNum + ": " +
-									 			 verificationWord + " position check failed (alignment: " + alignType.keyword +
-												 "; expected (unrounded): " + expectedPosition.getPixelValueString() + "; actual: " +
-												 itemOffset.getPixelValueString() + ")" );
+									// console.log( itemId + (verifyingColumnPositions ? "column" : "row") + " " + trackNum + ": " +
+									// 			 verificationWord + " position check failed (alignment: " + alignType.keyword +
+									//			 "; expected (unrounded): " + expectedPosition.getPixelValueString() + "; actual: " +
+									//			 itemOffset.getPixelValueString() + ")" );
 								}
 							}
 							else
 							{
-								console.log( itemId + (verifyingColumnPositions ? "column" : "row") + " " + trackNum + ": " + 
-											 verificationWord + " position check passed (alignment: " + alignType.keyword + 
-											 "; expected (unrounded): " + expectedPosition.getPixelValueString() + "; actual: " +
-											 itemOffset.getPixelValueString() + ")" );
+								// console.log( itemId + (verifyingColumnPositions ? "column" : "row") + " " + trackNum + ": " + 
+								//			 verificationWord + " position check passed (alignment: " + alignType.keyword + 
+								//			 "; expected (unrounded): " + expectedPosition.getPixelValueString() + "; actual: " +
+								//			 itemOffset.getPixelValueString() + ")" );
 							}
 							if ( verifyingColumnPositions )
 							{
@@ -2685,7 +2702,7 @@ Note:						If you change or improve on this script, please let us know by
 				if ( ! GridTest.trackIsFractionSized(a) ||
 					 ! GridTest.trackIsFractionSized(b) )
 				{
-					console.log("compareFractionTracksNormalMeasure called for non-fraction sized track");
+					// console.log("compareFractionTracksNormalMeasure called for non-fraction sized track");
 				}
 
 				var
@@ -2834,13 +2851,13 @@ Note:						If you change or improve on this script, please let us know by
 							if ( valueAndUnit.value === NULL ||
 								 valueAndUnit.unit === NULL )
 							{
-								console.log("Not a keyword or a valid CSS value; track " + (i + 1) + " = " + trackStrings[i]);
-								console.log("Invalid track definition '" + trackStrings[i] + "'");
+								// console.log("Not a keyword or a valid CSS value; track " + (i + 1) + " = " + trackStrings[i]);
+								// console.log("Invalid track definition '" + trackStrings[i] + "'");
 							}
 
 							if ( ! this.isValidCssValueUnit(valueAndUnit.unit) )
 							{
-								console.log("Invalid track unit '" + valueAndUnit.unit + "'");
+								// console.log("Invalid track unit '" + valueAndUnit.unit + "'");
 							}
 
 							newTrack			= new Track();
@@ -2921,7 +2938,7 @@ Note:						If you change or improve on this script, please let us know by
 	{
 		if ( measure % 1 !== 0 )
 		{
-			console.log("LayoutMeasures must be integers, measure was " + typeof(measure) + "(" + measure + ")" );
+			// console.log("LayoutMeasures must be integers, measure was " + typeof(measure) + "(" + measure + ")" );
 		}
 		this.internalMeasure = measure;
 	}
@@ -3047,7 +3064,7 @@ Note:						If you change or improve on this script, please let us know by
 	{
 		if ( ! ( measure instanceof LayoutMeasure ) )
 		{
-			console.log("LayoutMeasure.add only accepts layout measures");
+			// console.log("LayoutMeasure.add only accepts layout measures");
 		}
 		return new LayoutMeasure( this.internalMeasure + measure.internalMeasure );
 	};
@@ -3055,7 +3072,7 @@ Note:						If you change or improve on this script, please let us know by
 	{
 		if ( ! ( measure instanceof LayoutMeasure ) )
 		{
-			console.log("LayoutMeasure.subtract only accepts layout measures");
+			// console.log("LayoutMeasure.subtract only accepts layout measures");
 		}
 		return new LayoutMeasure( this.internalMeasure - measure.internalMeasure );
 	};
@@ -3063,7 +3080,7 @@ Note:						If you change or improve on this script, please let us know by
 	{
 		if ( typeof number !== "number" )
 		{
-			console.log("LayoutMeasure.multiply only accepts numbers");
+			// console.log("LayoutMeasure.multiply only accepts numbers");
 		}
 		// Integer arithmetic; drop any remainder.
 		return new LayoutMeasure( Math.floor(this.internalMeasure * number) );
@@ -3072,7 +3089,7 @@ Note:						If you change or improve on this script, please let us know by
 	{
 		if (typeof number !== "number")
 		{
-			console.log("LayoutMeasure.divide only accepts number");
+			// console.log("LayoutMeasure.divide only accepts number");
 		}
 		// Integer arithmetic; drop any remainder.
 		return new LayoutMeasure( Math.floor(this.internalMeasure / number) );
@@ -3081,7 +3098,7 @@ Note:						If you change or improve on this script, please let us know by
 	{
 		if ( ! ( measure instanceof LayoutMeasure ) )
 		{
-			console.log("LayoutMeasure.equals only accepts layout measures");
+			// console.log("LayoutMeasure.equals only accepts layout measures");
 		}
 		return this.internalMeasure === measure.internalMeasure;
 	};
@@ -3389,7 +3406,7 @@ Note:						If you change or improve on this script, please let us know by
 				return this.implicitTrackRanges[i];
 			}
 		}
-		console.log("getTrack: invalid track number " + trackNumber);
+		// console.log("getTrack: invalid track number " + trackNumber);
 	};
 	TrackManager.prototype.getTracks = function ( firstTrackNumber, lastTrackNumber )
 	{
@@ -3426,7 +3443,7 @@ Note:						If you change or improve on this script, please let us know by
 		}
 		if ( collection.length === 0 )
 		{
-			console.log("getTracks: a track in the range " + firstTrackNumber + " - " + lastTrackNumber + " doesn't exist");
+			// console.log("getTracks: a track in the range " + firstTrackNumber + " - " + lastTrackNumber + " doesn't exist");
 		}
 		return collection;
 	};
@@ -3469,13 +3486,13 @@ Note:						If you change or improve on this script, please let us know by
 		currentTrackIndex				= this.currentTrackIndex,
 		currentImplicitTrackRangeIndex	= this.currentImplicitTrackRangeIndex;
 		
-		//console.log('trackManager',trackManager);
-		//console.log('tracks',tracks);
-		//console.log('tracksLength',tracksLength);
-		//console.log('trackimplicitTrackRangesManager',implicitTrackRanges);
-		//console.log('implicitTrackRangesLength',implicitTrackRangesLength);
-		//console.log('currentTrackIndex',currentTrackIndex);
-		//console.log('currentImplicitTrackRangeIndex',currentImplicitTrackRangeIndex);
+		//// console.log('trackManager',trackManager);
+		//// console.log('tracks',tracks);
+		//// console.log('tracksLength',tracksLength);
+		//// console.log('trackimplicitTrackRangesManager',implicitTrackRanges);
+		//// console.log('implicitTrackRangesLength',implicitTrackRangesLength);
+		//// console.log('currentTrackIndex',currentTrackIndex);
+		//// console.log('currentImplicitTrackRangeIndex',currentImplicitTrackRangeIndex);
 		
 		if ( currentTrackIndex >= tracksLength )
 		{
