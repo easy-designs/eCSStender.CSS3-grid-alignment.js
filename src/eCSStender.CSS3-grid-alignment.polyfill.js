@@ -94,44 +94,8 @@ Note:			If you change or improve on this script, please let us know by
 	},
 	
 	// aliasing eCSStender's built-ins
-	isSupported				= e.isSupported,
-	getCSSValue				= e.getCSSValue,
-	elementMatchesSelector	= e.elementMatchesSelector,
-	emptyStyleSheets		= e.emptyStyleSheets;
+	getCSSValue				= e.getCSSValue;
 
-	// helpers
-	function defined( test )
-	{
-		return test != UNDEFINED;
-	}
-	function select( selector, context )
-	{
-		if ( defined( document.querySelectorAll ) )
-		{
-			select = function( selector, context )
-			{
-				return (context||document).querySelectorAll(selector);
-			};
-		}
-		// jQuery fallback
-		else
-		{
-			if ( ! defined( window.jQuery ) )
-			{
-				e.loadScript(
-					'http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js',
-					function(){
-						select( selector, context );
-					});
-			}
-			select = function( selector, context )
-			{
-				return window.jQuery(selector, context).get();
-			};
-		}
-		return select( selector, context );
-	}
-	
 	function WidthAndHeight()
 	{
 		this.width	= NULL;
@@ -180,8 +144,8 @@ Note:			If you change or improve on this script, please let us know by
 		//			 this.availableSpaceForColumns.getPixelValueString() + "; rows = " +
 		//			 this.availableSpaceForRows.getPixelValueString() );
         
-		GridTest.propertyParser.parseGridTracksString( gridCols, this.columnTrackManager );
-		GridTest.propertyParser.parseGridTracksString( gridRows, this.rowTrackManager );
+		PropertyParser.parseGridTracksString( gridCols, this.columnTrackManager );
+		PropertyParser.parseGridTracksString( gridRows, this.rowTrackManager );
         
 		this.mapGridItemsToTracks();
 		this.saveItemPositioningTypes();
@@ -370,13 +334,11 @@ Note:			If you change or improve on this script, please let us know by
 										: this.determineSize( 'width', margins, padding, borders );
 		heightToUse = height !== "auto" ? height
 										: this.determineSize( 'height', margins, padding, borders );
-		marginToUse			= getCSSValue( gridElement, 'margin' );
-		borderWidthToUse	= getCSSValue( gridElement, 'border-width' );
-		borderStyleToUse	= getCSSValue( gridElement, 'border-style' );
-		paddingToUse		= getCSSValue( gridElement, 'padding' );
 		cssText = "display: " + ( ! isInlineGrid ? "block" : "inline-block" )
-				+ "; margin: " + marginToUse + "; border-width: " + borderWidthToUse
-				+ "; padding: " + paddingToUse + "; border-style: " + borderStyleToUse
+				+ "; margin: " + getCSSValue( gridElement, 'margin' ) 
+				+ "; border-width: " + getCSSValue( gridElement, 'border-width' )
+				+ "; padding: " + getCSSValue( gridElement, 'padding' )
+				+ "; border-style: " + getCSSValue( gridElement, 'border-style' )
 				+ "; width: " + widthToUse
 				+ "; height: " + heightToUse
 				+ "; box-sizing: " + getCSSValue( gridElement, 'box-sizing' )
@@ -1462,10 +1424,6 @@ Note:			If you change or improve on this script, please let us know by
 		this.verifyGridItemTrackPositions(gridObject, FALSE);
 	};
 	
-	
-	
-	
-	
 	function Track()
 	{
 		this.number				= NULL;
@@ -1478,7 +1436,6 @@ Note:			If you change or improve on this script, please let us know by
 		this.contentSizedTrack	= FALSE;
 		this.implicit			= FALSE;
 	}
-
 	function ImplicitTrackRange()
 	{
 		this.firstNumber	= NULL;
@@ -1488,7 +1445,6 @@ Note:			If you change or improve on this script, please let us know by
 		this.items			= [];
 		this.measure		= NULL;
 	}
-	
 	function Item()
 	{
 		this.itemElement		= NULL;
@@ -1513,7 +1469,8 @@ Note:			If you change or improve on this script, please let us know by
 		};
 	}
 
-	var BoxSizeCalculator = {
+	var
+	BoxSizeCalculator = {
 		calcMarginBoxWidth: function( element )
 		{
 			// console.log('element',element);
@@ -1653,9 +1610,9 @@ Note:			If you change or improve on this script, please let us know by
 							 );
 			return boxHeight;
 		}
-	};
+	},
 	
-	var GridTest = {
+	GridTest = {
 		
 		verifyLayout: function ( element, properties )
 		{
@@ -1871,941 +1828,125 @@ Note:			If you change or improve on this script, please let us know by
 			
 				return shrinkToFitWidthAndHeight;
 			}
-		},
-		layoutVerifier: {
-			error		: FALSE,
-			verifyLayout: function ( gridObject )
+		}
+	},
+	
+	PropertyParser = {
+		// Parses property string definitions and get an associative array of track objects.
+		parseGridTracksString: function ( tracksDefinition, trackManager )
+		{
+			// TODO: add support for minmax definitions which will involve a more complicated tokenizer than split() (a regex?).
+			var
+			trackStrings	= tracksDefinition.split(regexSpaces),
+			length			= trackStrings.length,
+			i, newTrack, valueAndUnit;
+			if ( length === 1 &&
+				 ( trackStrings[0].length === 0 ||
+					 trackStrings[0].toLowerCase() === "none" ) )
 			{
-				var
-				gridElement = gridObject.gridElement;
-				
-				// Get the available space for the grid since it is required
-				// for determining track sizes for auto/fit-content/minmax 
-				// and fractional tracks.
-				this.determineGridAvailableSpace( gridObject );
-
-				// console.log("Grid element content available space: columns = " + 
-				//			gridObject.availableSpaceForColumns.getPixelValueString() + "; rows = " +
-				//			gridObject.availableSpaceForRows.getPixelValueString());
-
-				GridTest.propertyParser.parseGridTracksString(gridColumnsDefinition, gridObject.columnTrackManager);
-				GridTest.propertyParser.parseGridTracksString(gridRowsDefinition, gridObject.rowTrackManager);
-
-				gridObject.items = this.mapGridItemsToTracks(
-					gridObject.gridElement, gridObject.columnTrackManager, gridObject.rowTrackManager
-				);
-				this.saveItemPositioningTypes(gridObject);
-				
-				this.determineTrackSizes(
-					gridObject.gridElement, gridObject.columnTrackManager, gridObject.availableSpaceForColumns,
-					"width", gridObject.useAlternateFractionalSizingForColumns
-				);
-				this.determineTrackSizes(
-					gridObject.gridElement, gridObject.rowTrackManager, gridObject.availableSpaceForRows,
-					"height", gridObject.useAlternateFractionalSizingForRows
-				);
-
-				this.calculateGridItemShrinkToFitSizes(gridObject);
-
-				this.verifyGridItemSizes(gridObject);
-				this.verifyGridItemPositions(gridObject);
-
-				return ! this.error;
-			},
-
-			
-			isPercentageValue: function ( valueString )
+				// Empty definition.
+			}
+			else
 			{
-				return ( valueString[valueString.length - 1] === '%' );
-			},
-			isBorderWidthKeyword: function ( valueString )
-			{
-				var valueLower = valueString.toLowerCase();
-				return ( valueLower === "thin" || valueLower === "medium" || valueLower === "thick" );
-			},
-			buildCalcString: function ( width, operator, firstMargin, firstBorder, firstPadding, secondPadding, secondBorder, secondMargin )
-			{
-				var calcString = "calc(" + width + " " + operator + " ";
-				if ( firstMargin !== "" )
+				for ( i = 0; i < length; i++ )
 				{
-					calcString += firstMargin + " " + operator + " ";
-				}
-				if ( firstBorder !== "" )
-				{
-					calcString += firstBorder + " " + operator + " ";
-				}
-				if ( firstPadding !== "" )
-				{
-					calcString += firstPadding + " " + operator + " ";
-				}
-				if ( secondPadding !== "" )
-				{
-					calcString += secondPadding + " " + operator + " ";
-				}
-				if ( secondBorder !== "" )
-				{
-					calcString += secondBorder + " " + operator + " ";
-				}
-				if ( secondMargin !== "" )
-				{
-					calcString += secondMargin + " " + operator + " ";
-				}
-				return calcString += "0px)";
-			},
-			// UNUSED
-			//getItemBreadth: function ( blockProgression, verifyingColumnBreadths, itemElement )
-			//{
-			//	if ( ( ( blockProgression === blockProgressionEnum.tb ||
-			//			 blockProgression === blockProgressionEnum.bt ) &&
-			//			 verifyingColumnBreadths === TRUE ) ||
-			//		 ( ( blockProgression === blockProgressionEnum.lr ||
-			//			 blockProgression === blockProgressionEnum.rl ) &&
-			//			 verifyingColumnBreadths === FALSE ) )
-			//	{
-			//		return BoxSizeCalculator.calcMarginBoxWidth( itemElement );
-			//	}
-			//	else
-			//	{
-			//		return BoxSizeCalculator.calcMarginBoxHeight( itemElement );
-			//	}
-			//},
-			// verifyingColumnBreadths == TRUE => verify length of items in the direction of columns 
-			// verifyingColumnBreadths == FALSE => verify length of items in the direction of rows 
-			dumpTrackLengths: function ( trackManager )
-			{
-				var
-				trackIter	= trackManager.getIterator(),
-				curTrack	= trackIter.next(),
-				trackRange, trackInfoString;
+					trackStrings[i] = trackStrings[i].toLowerCase();
 
-				while ( curTrack !== NULL )
-				{
-					if ( curTrack instanceof implicitTrackRange )
+					newTrack = NULL;
+					if ( this.isKeywordTrackDefinition(trackStrings[i]) )
 					{
-						trackRange = curTrack.firstNumber;
-						if ( curTrack.span !== 1 )
-						{
-							trackRange += "-" + (curTrack.firstNumber + curTrack.span - 1);
-						}
+						newTrack			= new Track();
+						newTrack.number		= i + 1;
+						newTrack.size		= GridTest.layoutVerifier.gridTrackValueStringToEnum(trackStrings[i]);
+						newTrack.sizingType = sizingTypeEnum.keyword;
+						trackManager.addTrack(newTrack);
 					}
 					else
 					{
-						trackRange = curTrack.number;
+						// Not a keyword; this is a CSS value.
+						valueAndUnit = this.tryParseCssValue(trackStrings[i]);
+						if ( valueAndUnit.value === NULL ||
+							 valueAndUnit.unit === NULL )
+						{
+							// console.log("Not a keyword or a valid CSS value; track " + (i + 1) + " = " + trackStrings[i]);
+							// console.log("Invalid track definition '" + trackStrings[i] + "'");
+						}
+
+						if ( ! this.isValidCssValueUnit(valueAndUnit.unit) )
+						{
+							// console.log("Invalid track unit '" + valueAndUnit.unit + "'");
+						}
+
+						newTrack			= new Track();
+						newTrack.number		= i + 1;
+						newTrack.size		= valueAndUnit;
+						newTrack.sizingType = sizingTypeEnum.valueAndUnit;
+						trackManager.addTrack(newTrack);
 					}
-					trackInfoString = "track[" + trackRange + "] = " + curTrack.measure.getPixelValueString() + "px";
-
-					// console.log(trackInfoString);
-
-					curTrack = trackIter.next();
 				}
-			},
-			// http://blogs.msdn.com/b/ie/archive/2009/05/29/the-css-corner-writing-mode.aspx 
-			// is a great guide for how things should lay out.
-			horizontalOffsetsAreReversed: function ( gridUsedStyle )
+			}
+		},
+		// Parses CSS values into their value and their unit.
+		tryParseCssValue: function (typedValue)
+		{
+			// First match: 0 or more digits, an optional decimal, and any digits after the decimal.
+			// Second match: anything after the first match (the unit).
+			var
+			expression		= /^(\d*\.?\d*)(.*)/,
+			regexResult		= typedValue.match(expression),
+			valueAndUnit	= new CSSValueAndUnit();
+
+			if ( regexResult[0].length > 0 &&
+				 regexResult[1].length > 0 &&
+				 regexResult[2].length > 0 )
 			{
-				var
-				reverseDirection	= FALSE,
-				directionIsLTR		= gridUsedStyle.getPropertyValue("direction") === "ltr",
-				blockProgression	= GridTest.layoutVerifier.blockProgressionStringToEnum(
-										gridUsedStyle.getPropertyValue(BLOCKPROGRESSION)
-										);
-				if ( blockProgression === blockProgressionEnum.rl ||
-					 ( ! directionIsLTR &&
-						blockProgression !== blockProgressionEnum.lr ) )
+				if ( regexResult[1].indexOf('.') < 0 )
 				{
-					reverseDirection = TRUE;
-				}
-				return reverseDirection;
-			},
-			verticalOffsetsAreReversed: function ( gridUsedStyle )
-			{
-				var
-				reverseDirection	= FALSE,
-				directionIsLTR		= gridUsedStyle.getPropertyValue("direction") === "ltr",
-				blockProgression	= GridTest.layoutVerifier.blockProgressionStringToEnum(
-										gridUsedStyle.getPropertyValue(BLOCKPROGRESSION)
-										);
-				if ( blockProgression === blockProgressionEnum.bt ||
-					 ( ! directionIsLTR &&
-						 ( blockProgression === blockProgressionEnum.lr ||
-						 blockProgression === blockProgressionEnum.rl ) ) )
-				{
-					reverseDirection = TRUE;
-				}
-				return reverseDirection;
-			},
-			// Gets the grid item's logical offset relative to the grid element. 
-			// The returned offset is for the margin box.
-			// This function handles the physical to logical mapping for RTL.
-			getGridItemMarginBoxHorizontalOffset: function ( item )
-			{
-				var
-				itemElement		= item.itemElement,
-				parentElement	= itemElement.parentNode,
-
-				// Map physical offset to logical offset if necessary.
-				reverseDirection = this.horizontalOffsetsAreReversed(parentUsedStyle),
-				gridStartingContentEdgeOffset, parentOffsetAdjustment,
-				itemMarginLeft, itemStartingMarginEdgeOffset, marginBoxWidth, offsetFromGridStartingContentEdge;
-				
-				if ( parentUsedStyle.getPropertyValue("position") === "static" )
-				{
-					// Offsets are the border-box.
-					gridStartingContentEdgeOffset = LayoutMeasure.measureFromPx( parentElement.offsetLeft );
-					gridStartingContentEdgeOffset = gridStartingContentEdgeOffset
-														.add( LayoutMeasure.measureFromStyleProperty( parentElement, "border-left-width" ) )
-														.add( LayoutMeasure.measureFromStyleProperty( parentElement, "padding-left" ) );
-				}
-				else
-				{
-					// Grid is positioned; offset is based on the padding edge of the grid.
-					gridStartingContentEdgeOffset = LayoutMeasure.measureFromStyleProperty( parentElement, "padding-left" );
-				}
-
-				if ( reverseDirection === TRUE )
-				{
-					// Reversing direction; the starting edge is on the other side.
-					gridStartingContentEdgeOffset = gridStartingContentEdgeOffset
-														.add( LayoutMeasure.measureFromStyleProperty( parentElement, "width" ) );
-				}
-
-				itemMarginLeft					= LayoutMeasure.measureFromStyleProperty( itemElement, "margin-left" );
-				itemStartingMarginEdgeOffset	= LayoutMeasure
-													.measureFromPx( itemElement.offsetLeft )
-													.subtract(itemMarginLeft);
-				if ( reverseDirection === TRUE )
-				{
-					// Reversing direction; the starting edge is on the other side.
-					marginBoxWidth					= BoxSizeCalculator.calcMarginBoxWidth( itemElement );
-					itemStartingMarginEdgeOffset	= itemStartingMarginEdgeOffset.add( marginBoxWidth );
-				}
-				if (reverseDirection === FALSE)
-				{
-					offsetFromGridStartingContentEdge = itemStartingMarginEdgeOffset
-															.subtract( gridStartingContentEdgeOffset );
-				}
-				else
-				{
-					offsetFromGridStartingContentEdge = gridStartingContentEdgeOffset
-															.subtract( itemStartingMarginEdgeOffset );
-				}
-				return offsetFromGridStartingContentEdge;
-			},
-			getGridItemMarginBoxVerticalOffset: function ( item )
-			{
-				var
-				itemElement		= item.itemElement,
-				parentElement	= itemElement.parentNode,
-
-				// Map physical offset to logical offset if necessary.
-				reverseDirection = this.verticalOffsetsAreReversed(parentUsedStyle),
-				gridStartingContentEdgeOffset, parentOffsetAdjustment,
-				itemMarginTop, itemStartingMarginEdgeOffset, marginBoxHeight, offsetFromGridStartingContentEdge;
-				
-				if ( parentUsedStyle.getPropertyValue("position") === "static" )
-				{
-					// Offsets are the border-box.
-					gridStartingContentEdgeOffset = LayoutMeasure.measureFromPx( parentElement );
-					gridStartingContentEdgeOffset = gridStartingContentEdgeOffset
-														.add( LayoutMeasure.measureFromStyleProperty( parentElement, "border-top-width" ) )
-														.add( LayoutMeasure.measureFromStyleProperty( parentElement, "padding-top" ) );
-				}
-				else
-				{
-					// Grid is positioned; offset is based on the padding edge of the grid.
-					gridStartingContentEdgeOffset = LayoutMeasure.measureFromStyleProperty( parentElement, "padding-top" );
-				}
-
-				if ( reverseDirection === TRUE )
-				{
-					// Reversing direction; the starting edge is on the other side.
-					gridStartingContentEdgeOffset = gridStartingContentEdgeOffset
-														.add( LayoutMeasure.measureFromStyleProperty( parentElement, "height" ) );
-				}
-
-				itemMarginTop					= LayoutMeasure.measureFromStyleProperty( itemElement, "margin-top" );
-				itemStartingMarginEdgeOffset	= LayoutMeasure.measureFromPx( itemElement.offsetTop )
-													.subtract(itemMarginTop);
-
-				if ( reverseDirection === TRUE )
-				{
-					// Reversing direction; the starting edge is on the other side.
-					marginBoxHeight					= BoxSizeCalculator.calcMarginBoxHeight( itemElement );
-					itemStartingMarginEdgeOffset	= itemStartingMarginEdgeOffset.add(marginBoxHeight);
-				}
-				if (reverseDirection === FALSE)
-				{
-					offsetFromGridStartingContentEdge = itemStartingMarginEdgeOffset.subtract(gridStartingContentEdgeOffset);
+					valueAndUnit.value = parseInt(regexResult[1], 10);
 				}
 				else {
-					offsetFromGridStartingContentEdge = gridStartingContentEdgeOffset.subtract(itemStartingMarginEdgeOffset);
+					valueAndUnit.value = parseFloat(regexResult[1], 10);
 				}
-
-				return offsetFromGridStartingContentEdge;
-			},
-			// Gets the absolute positioned grid item's offset relative 
-			// to the grid element. The returned offset is for the margin box.
-			getAbsolutePositionedGridItemMarginBoxOffsetLeft: function ( item )
-			{
-				var
-				itemElement 			= item.itemElement,
-				gridElement 			= itemElement.parentNode,
-				containingElement		= this.getContainingBlockElementForAbsolutePositionedGridItems(itemElement.parentNode),
-				itemUsedStyle			= WINDOW.getComputedStyle(itemElement),
-				gridElementUsedStyle	= WINDOW.getComputedStyle(gridElement, NULL),
-				itemOffset				= LayoutMeasure.measureFromPx(itemElement.offsetLeft);
-
-				if (containingElement !== itemElement.offsetParent)
-				{
-					// console.log("Absolute position grid item has wrong offsetParent");
-				}
-				if ( itemUsedStyle.getPropertyValue("left") === "auto" &&
-					 itemUsedStyle.getPropertyValue("right") === "auto" )
-				{
-					// Positioned where it would have been if it was in the grid.
-					if ( gridElementUsedStyle.getPropertyValue("position") === "static" )
-					{
-						// Grid wasn't the containing block; adjust the offset based on the grid's offset and MBP since it uses the same containing block.
-						itemOffset = itemOffset
-										.subtract( LayoutMeasure.measureFromPx(gridElement.offsetLeft )
-										.add( LayoutMeasure.measureFromStyleProperty(gridElementUsedStyle, "margin-left") )
-										.add( LayoutMeasure.measureFromStyleProperty(gridElementUsedStyle, "border-left-width") )
-										.add( LayoutMeasure.measureFromStyleProperty(gridElementUsedStyle, "padding-left") ) );
-					}
-				}
-				if (gridElementUsedStyle.getPropertyValue("position") !== "static")
-				{
-					// The grid is the containing block; adjust the offset based on the grid's border and padding.
-					itemOffset = itemOffset.subtract( LayoutMeasure.measureFromStyleProperty(gridElementUsedStyle, "padding-left") );
-				}
-				return itemOffset;
-			},
-			// Gets the absolute positioned grid item's offset relative to the 
-			// grid element. The returned offset is for the margin box.
-			getAbsolutePositionedGridItemMarginBoxOffsetTop: function ( item )
-			{
-				var
-				itemElement				= item.itemElement,
-				gridElement				= item.itemElement.parentNode,
-				containingElement		= this.getContainingBlockElementForAbsolutePositionedGridItems(itemElement.parentNode),
-				itemUsedStyle			= WINDOW.getComputedStyle(itemElement),
-				gridElementUsedStyle	= WINDOW.getComputedStyle(gridElement, NULL),
-				itemOffset				= LayoutMeasure.measureFromPx(itemElement.offsetTop);
-				
-				if ( containingElement !== itemElement.offsetParent )
-				{
-					// console.log("Absolute position grid item has wrong offsetParent");
-				}
-				if ( itemUsedStyle.getPropertyValue("top") === "auto" &&
-					 itemUsedStyle.getPropertyValue("bottom") === "auto" )
-				{
-					// Positioned where it would have been if it was in the grid.
-					if ( gridElementUsedStyle.getPropertyValue("position") === "static" )
-					{
-						// Grid wasn't the containing block; adjust the offset based on 
-						// the grid's offset and MBP since it uses the same containing block.
-						itemOffset = itemOffset
-										.subtract( LayoutMeasure.measureFromPx(gridElement.offsetLeft )
-										.add( LayoutMeasure.measureFromStyleProperty(gridElementUsedStyle, "margin-top") )
-										.add( LayoutMeasure.measureFromStyleProperty(gridElementUsedStyle, "border-top-width") )
-										.add( LayoutMeasure.measureFromStyleProperty(gridElementUsedStyle, "padding-top") ) );
-					}
-				}
-				if ( gridElementUsedStyle.getPropertyValue("position") !== "static" )
-				{
-					// The grid is the containing block; adjust the offset based on the grid's border and padding.
-					itemOffset = itemOffset.subtract( LayoutMeasure.measureFromStyleProperty(gridElementUsedStyle, "padding-top") );
-				}
-				return itemOffset;
-			},
-			getContainingBlockElementForAbsolutePositionedGridItems: function (gridElement)
-			{
-				var
-				curElement = gridElement,
-				curUsedStyle, curPosition;
-
-				// CSS 2.1: 10.1 Definition of "containing block"
-				//	 4. If the element has 'position: absolute', the containing block is established by the
-				//		nearest ancestor with a 'position' of 'absolute', 'relative' or 'fixed', ...
-				// TODO: handle rtl
-				do {
-					curUsedStyle = WINDOW.getComputedStyle(curElement, NULL);
-					curPosition = curUsedStyle.getPropertyValue("position");
-
-					if (curPosition === "absolute" || curPosition === "relative" || curPosition === "fixed") {
-						break;
-					}
-					curElement = curElement.parentNode;
-				}
-				while (curElement !== document.body && curElement !== document.documentElement);
-
-				if (curElement !== gridElement && curElement !== gridElement.offsetParent)
-				{
-					// console.log("offsetParent doesn't agree with calculated containing block");
-				}
-				return curElement;
-			},
-			getContainingBlockElementForStaticPositionedGridItems: function()
-			{
-				// CSS 2.1: 10.1 Definition of "containing block"
-				//	 3. If the element has 'position: fixed', the containing block is established by the
-				//		viewport in the case of continuous media or the page area in the case of paged media.
-				//
-				// All browsers except for Firefox return a NULL offsetParent for fixed positioned elements.
-				return ( vendorPrefix === "moz" ) ? document.body : NULL;
-			},
-			// verifyingColumnPositions == TRUE => verify positions of items along the columns 
-			// verifyingColumnPositions == FALSE => verify positions of items along the rows 
-			verifyGridItemTrackPositions: function (gridObject, verifyingColumnPositions)
-			{
-				var
-				trackManager				= verifyingColumnPositions	? gridObject.columnTrackManager
-																		: gridObject.rowTrackManager,
-				verificationWord			= verifyingColumnPositions ? "column" : "row",
-				curTrackStartPosition		= LayoutMeasure.zero(),
-				curTrackEndPosition			= LayoutMeasure.zero(),
-				inFirstTrack				= TRUE,
-				lastTrackWasContentSized	= FALSE,
-				trackIter					= trackManager.getIterator(),
-				curTrack					= trackIter.next(),
-				verifyingHorizontalOffsets	= this.usePhysicalWidths(gridObject.blockProgression, verifyingColumnPositions),
-				gridUsedStyle				= WINDOW.getComputedStyle(gridObject.gridElement, NULL),
-				i, len, curItem, curGridItemUsedStyle, alignType,
-				actualMeasure, firstTrack, trackSpan, spannedTrackMeasure,
-				itemOffset, itemId, trackNum, expectedPosition,
-				expectedPositionRounded, itemOffsetRounded;
-
-				while ( curTrack !== NULL )
-				{
-					// The start of this track is right after where the previous one ends.
-					if ( ! inFirstTrack )
-					{
-						curTrackStartPosition = curTrackEndPosition.add(new LayoutMeasure(1));
-					}
-					else {
-						inFirstTrack = FALSE;
-					}
-					curTrackEndPosition = curTrackStartPosition
-											.add( curTrack.measure )
-											.subtract(new LayoutMeasure(1));
-
-					for (i=0, len=curTrack.items.length; i < len; i++)
-					{
-						curItem = curTrack.items[i];
-						// For spanning elements, we can have a single cell occupying more than one track.
-						// The first track that contains it will trigger its verification.
-						if ( ( verifyingColumnPositions ? curItem.verified.columnPosition : curItem.verified.rowPosition ) !== TRUE )
-						{
-							alignType			= verifyingColumnPositions ? curItem.columnAlign : curItem.rowAlign;
-							actualMeasure		= verifyingHorizontalOffsets ?
-													BoxSizeCalculator.calcMarginBoxWidth( curItem ) :
-													BoxSizeCalculator.calcMarginBoxHeight( curItem );
-							firstTrack			= verifyingColumnPositions ? curItem.column : curItem.row;
-							trackSpan			= verifyingColumnPositions ? curItem.columnSpan : curItem.rowSpan;
-							spannedTrackMeasure	= this.getSumOfSpannedTrackMeasures(trackManager, firstTrack, trackSpan);
-
-							switch (curItem.position)
-							{
-								case positionEnum['static']:
-								case positionEnum.relative:
-									itemOffset = verifyingHorizontalOffsets ?
-												 this.getGridItemMarginBoxHorizontalOffset( curItem ) :
-												 this.getGridItemMarginBoxVerticalOffset( curItem );
-									break;
-								case positionEnum.absolute:
-									itemOffset = verifyingHorizontalOffsets ?
-												 this.getAbsolutePositionedGridItemMarginBoxOffsetLeft( curItem ) :
-												 this.getAbsolutePositionedGridItemMarginBoxOffsetTop( curItem );
-									// TODO: determine if we need to check the containing block's writing mode
-									// instead of the grid's.
-									// Temporarily allow the current, wrong behavior, by considering it to 
-									// always be "start" positioned if it is absolute with an auto position.
-									if ( verifyingHorizontalOffsets &&
-										 curGridItemUsedStyle.getPropertyValue("left") === "auto" &&
-										 curGridItemUsedStyle.getPropertyValue("right") === "auto")
-									{
-										alignType = gridAlignEnum.start;
-									}
-									else if ( ! verifyingHorizontalOffsets &&
-												curGridItemUsedStyle.getPropertyValue("top") === "auto" &&
-												curGridItemUsedStyle.getPropertyValue("bottom") === "auto" )
-									{
-											alignType = gridAlignEnum.start;
-									}
-									break;
-								case positionEnum.fixed:
-									if ( curItem.itemElement.offsetParent !== this.getContainingBlockElementForStaticPositionedGridItems() )
-									{
-										// console.log("Fixed position grid item has wrong offsetParent");
-									}
-									itemOffset = verifyingHorizontalOffsets ?
-												 LayoutMeasure.measureFromPx(curItem.itemElement.offsetLeft) :
-												 LayoutMeasure.measureFromPx(curItem.itemElement.offsetTop);
-									break;
-								default:
-									// console.log("Unknown position type " + curItem.position.keyword);
-							}
-
-							itemId = "";
-							if ( curItem.itemElement.id.length > 0 )
-							{
-								itemId = "[ID = " + curItem.itemElement.id + "] ";
-							}
-							trackNum = verifyingColumnPositions ? curItem.column : curItem.row;
-
-							if ( curItem.position === positionEnum.fixed )
-							{
-								/* Fixed position grid items aren't positioned by the grid.
-								 * TODO: determine if the following TODO makes sense
-								 * (can fixed position items be influenced by a writing mode?)
-								 * TODO: update getLeftPositionForFixedPosition/getTopPositionForFixedPosition 
-								 * to be named getColumnPositionForFixedPosition/getRowPositionForFixedPosition
-								 * and have them check the writing mode of the root of the document.
-								 **/
-								expectedPosition = verifyingColumnPositions ?
-													 this.getLeftPositionForFixedPosition(curGridItemUsedStyle) :
-													 this.getTopPositionForFixedPosition(curGridItemUsedStyle);
-							}
-							else
-							{
-								switch (alignType)
-								{
-									case gridAlignEnum.stretch:
-									case gridAlignEnum.start:
-										// Item is placed at the beginning of the track.
-										expectedPosition = curTrackStartPosition;
-										break;
-									case gridAlignEnum.end:
-										// Item is placed at the end of the tracks it spans.
-										expectedPosition = curTrackStartPosition.add(spannedTrackMeasure.subtract(actualMeasure));
-										break;
-									case gridAlignEnum.center:
-										// Item is centered in the tracks it spans.
-										expectedPosition = curTrackStartPosition
-															.add( spannedTrackMeasure.subtract(actualMeasure).divide(2) );
-										break;
-									default:
-										// console.log("Unknown grid align type " + alignType.keyword);
-								}
-							}
-
-							// Relative positioned elements are sized and positioned 
-							// normally and, after that is complete, have their positions adjusted.
-							if ( curItem.position === positionEnum.relative )
-							{
-								if ( verifyingHorizontalOffsets )
-								{
-									expectedPosition = this.adjustLeftPositionForRelativePosition(curGridItemUsedStyle, expectedPosition);
-								}
-								else
-								{
-									expectedPosition = this.adjustTopPositionForRelativePosition(curGridItemUsedStyle, expectedPosition);
-								}
-							}
-							else if ( curItem.position === positionEnum.absolute )
-							{
-								if ( verifyingColumnPositions )
-								{
-									if ( curGridItemUsedStyle.getPropertyValue("left") !== "auto" )
-									{
-										expectedPosition = LayoutMeasure.measureFromStyleProperty(curGridItemUsedStyle, "left")
-																.add( LayoutMeasure.measureFromStyleProperty(curGridItemUsedStyle, "margin-left") );
-									}
-									else if ( curGridItemUsedStyle.getPropertyValue("right") !== "auto" )
-									{
-										/* We don't get a used value for "left" if it was auto 
-										 * and right was specified ("auto" is returned).
-										 * The only browser that returns the used values correctly is Firefox.
-										 * Bug was filed for this issue but wasn't fixed for IE9. It might be for IE10.
-										 * It is harder to determine the position for when right is specified because 
-										 * we need to figure out our parent's box size, subtract the value for the
-										 * right property from that, and then subtract the size of our box. 
-										 **/
-										// console.log("Not implemented: verification of absolute positioned items with 'right' specified and 'left' auto.");
-									}
-								}
-								else
-								{
-									if ( curGridItemUsedStyle.getPropertyValue("top") !== "auto" )
-									{
-										expectedPosition = LayoutMeasure.measureFromStyleProperty(curGridItemUsedStyle, "top")
-															.add( LayoutMeasure.measureFromStyleProperty(curGridItemUsedStyle, "margin-top") );
-									}
-									else if ( curGridItemUsedStyle.getPropertyValue("bottom") !== "auto" )
-									{
-										// See note above about why we didn't implement this (it's extra work).
-										// console.log("Not implemented: verification of absolute positioned items with 'bottom' specified and 'top' auto.");
-									}
-								}
-							}
-							
-							// offsets don't include fractional pixels; always round
-							expectedPositionRounded = expectedPosition.getMeasureRoundedToWholePixel();
-							// also round the offset in case it is a logical offset
-							// (i.e. a different writing mode) which may contain a fractional pixel
-							itemOffsetRounded = itemOffset.getMeasureRoundedToWholePixel();
-
-							if (expectedPositionRounded.equals(itemOffsetRounded) !== TRUE)
-							{
-								// If it is center aligned, allow a small margin of error.
-								if ( alignType === gridAlignEnum.center &&
-										// less than a pixel off
-									 Math.abs(expectedPosition
-												.subtract(itemOffset)
-												.getRawMeasure()) < Math.pow(10, precision) &&
-									 // within 1 layout pixel of rounding differently
-									 Math.abs(expectedPosition.getRawMeasure() - itemOffset.getRawMeasure()) % (
-										5 * Math.pow(10, precision-1) ) <= 1 )
-								{
-									// console.log( itemId + (verifyingColumnPositions ? "column" : "row") +
-									//			 " " + trackNum + ": " + verificationWord +
-									//			 " position check passed for center aligned item after adjustment (alignment: " +
-									//			 alignType.keyword + "; expected (unrounded): " + expectedPosition.getPixelValueString() +
-									//			 "; actual: " + itemOffset.getPixelValueString() + ")" );
-								}
-								 // Check if offset rounding errors may have caused an allowable difference.
-								else if (
-									// Offset is reversed; compounding rounding error may have caused a problem.
-									( verifyingHorizontalOffsets &&
-										this.horizontalOffsetsAreReversed(gridUsedStyle) ||
-	 									! verifyingHorizontalOffsets &&
-	 									this.verticalOffsetsAreReversed(gridUsedStyle) ) &&
-									// Stretch/end don't have any additional rounding problems since they hit the far edge.
-									( alignType !== gridAlignEnum.stretch ||
-										alignType !== gridAlignEnum.end ) &&
-									// Within 1 pixel.
-									Math.abs(expectedPosition.getRawMeasure() - itemOffset.getRawMeasure()) < 
-										Math.pow(10, precision) )
-								{
-									// console.log( itemId + (verifyingColumnPositions ? "column" : "row") + " " + trackNum +
-									// 			 ": " + verificationWord +
-									//			 " position check passed for non-stretch/non-end aligned reversed offset item after adjustment (alignment: " +
-									//			 alignType.keyword + "; expected (unrounded): " + expectedPosition.getPixelValueString() + 
-									//			 "; actual: " + itemOffset.getPixelValueString() + ")" );
-								}
-								else
-								{
-									this.error = TRUE;
-									// console.log( itemId + (verifyingColumnPositions ? "column" : "row") + " " + trackNum + ": " +
-									// 			 verificationWord + " position check failed (alignment: " + alignType.keyword +
-									//			 "; expected (unrounded): " + expectedPosition.getPixelValueString() + "; actual: " +
-									//			 itemOffset.getPixelValueString() + ")" );
-								}
-							}
-							else
-							{
-								// console.log( itemId + (verifyingColumnPositions ? "column" : "row") + " " + trackNum + ": " + 
-								//			 verificationWord + " position check passed (alignment: " + alignType.keyword + 
-								//			 "; expected (unrounded): " + expectedPosition.getPixelValueString() + "; actual: " +
-								//			 itemOffset.getPixelValueString() + ")" );
-							}
-							if ( verifyingColumnPositions )
-							{
-								curItem.verified.columnPosition = TRUE;
-							}
-							else
-							{
-								curItem.verified.rowPosition = TRUE;
-							}
-						}
-					}
-					if (curTrack.contentSizedTrack)
-					{
-						lastTrackWasContentSized = TRUE;
-					}
-					else
-					{
-						lastTrackWasContentSized = FALSE;
-					}
-					curTrack = trackIter.next();
-				}
-			},
-			adjustLeftPositionForRelativePosition: function (usedStyle, expectedLeftPosition)
-			{
-				var adjusted = expectedLeftPosition;
-				if ( usedStyle.left !== "auto" )
-				{
-					adjusted = adjusted.add( LayoutMeasure.measureFromStyleProperty(usedStyle, "left") );
-				}
-				else if (usedStyle.right !== "auto")
-				{
-					adjusted = adjusted.subtract( LayoutMeasure.measureFromStyleProperty(usedStyle, "right") );
-				}
-				return adjusted;
-			},
-			adjustTopPositionForRelativePosition: function ( usedStyle, expectedTopPosition )
-			{
-				var adjusted = expectedTopPosition;
-				if ( usedStyle.top !== "auto" )
-				{
-					adjusted = adjusted.add( LayoutMeasure.measureFromStyleProperty(usedStyle, "top") );
-				}
-				else if ( usedStyle.bottom !== "auto" )
-				{
-					adjusted = adjusted.subtract( LayoutMeasure.measureFromStyleProperty(usedStyle, "bottom") );
-				}
-				return adjusted;
-			},
-			getTopPositionForFixedPosition: function (usedStyle)
-			{
-				var expectedTopPosition = 0;
-				if ( usedStyle.top !== "auto" )
-				{
-					expectedTopPosition = LayoutMeasure.measureFromStyleProperty(usedStyle, "top");
-				}
-				else if ( usedStyle.bottom !== "auto" )
-				{
-					expectedTopPosition = LayoutMeasure.measureFromStyleProperty(usedStyle, "bottom");
-				}
-				return expectedTopPosition;
-			},
-			getLeftPositionForFixedPosition: function (usedStyle)
-			{
-				var expectedLeftPosition = 0;
-				if ( usedStyle.left !== "auto" )
-				{
-					expectedLeftPosition = LayoutMeasure.measureFromStyleProperty(usedStyle, "left");
-				}
-				else if ( usedStyle.right !== "auto" )
-				{
-					expectedLeftPosition = LayoutMeasure.measureFromStyleProperty(usedStyle, "right");
-				}
-				return expectedLeftPosition;
-			},
-			compareFractionTracksNormalMeasure: function (a, b)
-			{
-				if ( ! GridTest.trackIsFractionSized(a) ||
-					 ! GridTest.trackIsFractionSized(b) )
-				{
-					// console.log("compareFractionTracksNormalMeasure called for non-fraction sized track");
-				}
-
-				var
-				result = 0,
-				// Called from a sort function; can't depend on "this" object being GridTest.layoutVerifier.
-				normalFractionMeasureA = GridTest.layoutVerifier.getNormalFractionMeasure.call(GridTest.layoutVerifier, a),
-				normalFractionMeasureB = GridTest.layoutVerifier.getNormalFractionMeasure.call(GridTest.layoutVerifier, b);
-				if ( normalFractionMeasureA.getRawMeasure() < normalFractionMeasureB.getRawMeasure() )
-				{
-					result = -1;
-				}
-				else if ( normalFractionMeasureA.getRawMeasure() > normalFractionMeasureB.getRawMeasure() )
-				{
-					result = 1;
-				}
-				else
-				{
-					if ( a.size.value > b.size.value )
-					{
-						result = -1;
-					}
-					else if ( a.size.value < b.size.value )
-					{
-						result = 1;
-					}
-				}
-				return result;
-			},
-			isSmallerNumberAndWithinOneOfLargerNumber: function (smaller, larger)
-			{
-				if ( ( larger - smaller ) <= 1 )
-				{
-					return TRUE;
-				}
-				return FALSE;
-			},
-			determineMeasureOfOneFractionUnconstrained: function (fractionalTracks)
-			{
-				// Iterate over all of the fractional tracks, 
-				var
-				maxOneFractionMeasure = LayoutMeasure.zero(),
-				i, iLen = fractionalTracks.length,
-				curTrack, curFractionValue, oneFractionMeasure;
-				for ( i=0; i < iLen; i++ )
-				{
-					curTrack			= fractionalTracks[i];
-					curFractionValue	= curTrack.size.value;
-					oneFractionMeasure	= curTrack.maxMeasure.divide(curFractionValue);
-					if ( oneFractionMeasure.getRawMeasure() > maxOneFractionMeasure.getRawMeasure() )
-					{
-						maxOneFractionMeasure = oneFractionMeasure;
-					}
-				}
-				return maxOneFractionMeasure;
-			},
-			getContentBasedTracksThatSpanCrosses: function ( trackManager, firstTrackNum, numSpanned )
-			{
-				var
-				contentBasedTracks	= [],
-				tracks				= trackManager.getTracks(firstTrackNum, firstTrackNum + numSpanned - 1),
-				i, iLen = tracks.length, size;
-				for ( i = 0; i < iLen; i++ )
-				{
-					size = tracks[i].size;
-					if ( tracks[i].sizingType === sizingTypeEnum.keyword &&
-						 ( size === gridTrackValueEnum.fitContent ||
-							 size === gridTrackValueEnum.auto ) )
-					{
-						contentBasedTracks.push(tracks[i]);
-					}
-				}
-				return contentBasedTracks;
-			},
-			redistributeSpace: function (tracksToGrow, remainingSpace, totalSpaceToRedistribute)
-			{
-				var
-				spaceToRedistribute	= LayoutMeasure.min(remainingSpace, totalSpaceToRedistribute),
-				totalNumberOfTracks	= 0,
-				i, iLen = tracksToGrow.length,
-				measureToAddPerTrack;
-				
-				remainingSpace = remainingSpace.subtract(spaceToRedistribute);
-
-				for ( i = 0; i < iLen; i++ )
-				{
-					if ( tracksToGrow[i] instanceof implicitTrackRange )
-					{
-						totalNumberOfTracks += tracksToGrow[i].span;
-					}
-					else
-					{
-						totalNumberOfTracks += 1;
-					}
-				}
-
-				measureToAddPerTrack = spaceToRedistribute.divide(totalNumberOfTracks);
-				for ( i = 0; i < iLen; i++ )
-				{
-					if ( tracksToGrow[i] instanceof implicitTrackRange )
-					{
-						tracksToGrow[i].measure = tracksToGrow[i].measure.add(measureToAddPerTrack.multiply(tracksToGrow[i].span));
-					}
-					else
-					{
-						tracksToGrow[i].measure = tracksToGrow[i].measure.add(measureToAddPerTrack);
-					}
-				}
-				return remainingSpace;
+				valueAndUnit.unit = regexResult[2];
 			}
+			return valueAndUnit;
 		},
-		
-		propertyParser: {
-			// Parses property string definitions and get an associative array of track objects.
-			parseGridTracksString: function ( tracksDefinition, trackManager )
+		isValidCssValueUnit: function (unit)
+		{
+			var ret = FALSE;
+			switch (unit)
 			{
-				// TODO: add support for minmax definitions which will involve a more complicated tokenizer than split() (a regex?).
-				var
-				trackStrings	= tracksDefinition.split(regexSpaces),
-				length			= trackStrings.length,
-				i, newTrack, valueAndUnit;
-				if ( length === 1 &&
-					 ( trackStrings[0].length === 0 ||
-						 trackStrings[0].toLowerCase() === "none" ) )
-				{
-					// Empty definition.
-				}
-				else
-				{
-					for ( i = 0; i < length; i++ )
-					{
-						trackStrings[i] = trackStrings[i].toLowerCase();
-
-						newTrack = NULL;
-						if ( this.isKeywordTrackDefinition(trackStrings[i]) )
-						{
-							newTrack			= new Track();
-							newTrack.number		= i + 1;
-							newTrack.size		= GridTest.layoutVerifier.gridTrackValueStringToEnum(trackStrings[i]);
-							newTrack.sizingType = sizingTypeEnum.keyword;
-							trackManager.addTrack(newTrack);
-						}
-						else
-						{
-							// Not a keyword; this is a CSS value.
-							valueAndUnit = this.tryParseCssValue(trackStrings[i]);
-							if ( valueAndUnit.value === NULL ||
-								 valueAndUnit.unit === NULL )
-							{
-								// console.log("Not a keyword or a valid CSS value; track " + (i + 1) + " = " + trackStrings[i]);
-								// console.log("Invalid track definition '" + trackStrings[i] + "'");
-							}
-
-							if ( ! this.isValidCssValueUnit(valueAndUnit.unit) )
-							{
-								// console.log("Invalid track unit '" + valueAndUnit.unit + "'");
-							}
-
-							newTrack			= new Track();
-							newTrack.number		= i + 1;
-							newTrack.size		= valueAndUnit;
-							newTrack.sizingType = sizingTypeEnum.valueAndUnit;
-							trackManager.addTrack(newTrack);
-						}
-					}
-				}
-			},
-			// Parses CSS values into their value and their unit.
-			tryParseCssValue: function (typedValue)
-			{
-				// First match: 0 or more digits, an optional decimal, and any digits after the decimal.
-				// Second match: anything after the first match (the unit).
-				var
-				expression		= /^(\d*\.?\d*)(.*)/,
-				regexResult		= typedValue.match(expression),
-				valueAndUnit	= new CSSValueAndUnit();
-
-				if ( regexResult[0].length > 0 &&
-					 regexResult[1].length > 0 &&
-					 regexResult[2].length > 0 )
-				{
-					if ( regexResult[1].indexOf('.') < 0 )
-					{
-						valueAndUnit.value = parseInt(regexResult[1], 10);
-					}
-					else {
-						valueAndUnit.value = parseFloat(regexResult[1], 10);
-					}
-					valueAndUnit.unit = regexResult[2];
-				}
-				return valueAndUnit;
-			},
-			isValidCssValueUnit: function (unit)
-			{
-				var ret = FALSE;
-				switch (unit)
-				{
-					case 'px':
-					case '%':
-					case 'pt':
-					case 'pc':
-					case 'in':
-					case 'cm':
-					case 'mm':
-					case 'em':
-					case 'ex':
-					case 'vh':
-					case 'vw':
-					case 'vm':
-					case 'ch':
-					case 'rem':
-					case 'fr': // Grid only
-						ret = TRUE;
-				}
-				return ret;
-			},
-			isKeywordTrackDefinition: function (definition)
-			{
-				var ret = FALSE;
-				switch (definition)
-				{
-					case gridTrackValueEnum.auto.keyword:
-					case gridTrackValueEnum.minContent.keyword:
-					case gridTrackValueEnum.maxContent.keyword:
-					case gridTrackValueEnum.fitContent.keyword:
-						ret = TRUE;
-				}
-				return ret;
+				case 'px':
+				case '%':
+				case 'pt':
+				case 'pc':
+				case 'in':
+				case 'cm':
+				case 'mm':
+				case 'em':
+				case 'ex':
+				case 'vh':
+				case 'vw':
+				case 'vm':
+				case 'ch':
+				case 'rem':
+				case 'fr': // Grid only
+					ret = TRUE;
 			}
+			return ret;
+		},
+		isKeywordTrackDefinition: function (definition)
+		{
+			var ret = FALSE;
+			switch (definition)
+			{
+				case gridTrackValueEnum.auto.keyword:
+				case gridTrackValueEnum.minContent.keyword:
+				case gridTrackValueEnum.maxContent.keyword:
+				case gridTrackValueEnum.fitContent.keyword:
+					ret = TRUE;
+			}
+			return ret;
 		}
 	};
 	
@@ -3360,15 +2501,6 @@ Note:			If you change or improve on this script, please let us know by
 		implicitTrackRangesLength		= implicitTrackRanges.length,
 		currentTrackIndex				= this.currentTrackIndex,
 		currentImplicitTrackRangeIndex	= this.currentImplicitTrackRangeIndex;
-		
-		//// console.log('trackManager',trackManager);
-		//// console.log('tracks',tracks);
-		//// console.log('tracksLength',tracksLength);
-		//// console.log('trackimplicitTrackRangesManager',implicitTrackRanges);
-		//// console.log('implicitTrackRangesLength',implicitTrackRangesLength);
-		//// console.log('currentTrackIndex',currentTrackIndex);
-		//// console.log('currentImplicitTrackRangeIndex',currentImplicitTrackRangeIndex);
-		
 		if ( currentTrackIndex >= tracksLength )
 		{
 			returnNextTrackRange = TRUE;
@@ -3394,18 +2526,5 @@ Note:			If you change or improve on this script, please let us know by
 		}
 		return next;
 	};
-	
-	
-	// for Mozilla/Safari/Opera
-	//if ( WINDOW.addEventListener )
-	//{
-	//	WINDOW.addEventListener( ONRESIZE, GridManager.layout, FALSE );
-	//}
-	//// If IE event model is used
-	//else if ( WINDOW.attachEvent )
-	//{
-	//	// ensure firing before onload, maybe late but safe also for iframes
-	//	WINDOW.attachEvent( ONRESIZE, GridManager.layout );
-	//}
 	
 })(eCSStender);
