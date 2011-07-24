@@ -1157,6 +1157,25 @@ Note:			If you change or improve on this script, please let us know by
 			var frValue = track.size.value;
 			return frValue === 0 ? LayoutMeasure.zero() : track.measure.divide(frValue);
 		},
+		determineMeasureOfOneFractionUnconstrained: function ( fractionalTracks )
+		{
+		    // Iterate over all of the fractional tracks, 
+		    var
+			maxOneFractionMeasure = LayoutMeasure.zero(),
+			i					  = fractionalTracks.length,
+			curTrack, curFractionValue, oneFractionMeasure;
+		    while ( i-- )
+			{
+				curTrack			= fractionalTracks[i];
+				curFractionValue	= curTrack.size.value;
+				oneFractionMeasure	= curTrack.maxMeasure.divide(curFractionValue);
+				if ( oneFractionMeasure.getRawMeasure() > maxOneFractionMeasure.getRawMeasure() )
+				{
+				    maxOneFractionMeasure = oneFractionMeasure;
+				}
+			}
+			return maxOneFractionMeasure;
+		},
 		saveUsedCellWidths: function ( columnTrackManager )
 		{
 			var
