@@ -312,7 +312,7 @@ Note:			If you change or improve on this script, please let us know by
 		{
 			var
 			gridElement			= this.gridElement,
-			dummy				= gridElement.cloneNode(),
+			dummy				= gridElement.cloneNode(TRUE),
 			gridProperties		= this.properties,
 			gridElementParent	= gridElement.parentNode,
 			isInlineGrid,
@@ -750,14 +750,12 @@ Note:			If you change or improve on this script, please let us know by
 							{
 								if ( computingColumns )
 								{
-									curItem.maxWidthMeasure = GridTest
-																.intrinsicSizeCalculator
+									curItem.maxWidthMeasure = IntrinsicSizeCalculator
 																.calcMaxWidth(curItem.itemElement);
 								}
 								else
 								{
-									curItem.maxHeightMeasure = GridTest
-																.intrinsicSizeCalculator
+									curItem.maxHeightMeasure = IntrinsicSizeCalculator
 																.calcMaxHeight( curItem.itemElement, curItem.usedWidthMeasure );
 								}
 							}
@@ -782,15 +780,11 @@ Note:			If you change or improve on this script, please let us know by
 							{
 								if ( computingColumns )
 								{
-									minItemMeasure = GridTest
-														.intrinsicSizeCalculator
-														.calcMinWidth(curItem.itemElement);
+									minItemMeasure = IntrinsicSizeCalculator.calcMinWidth(curItem.itemElement);
 								}
 								else
 								{
-									minItemMeasure = GridTest
-														.intrinsicSizeCalculator
-														.calcMinHeight(curItem.itemElement, curItem.usedWidthMeasure);
+									minItemMeasure = IntrinsicSizeCalculator.calcMinHeight(curItem.itemElement, curItem.usedWidthMeasure);
 								}
 								if ( minItemMeasure.getRawMeasure() > curTrack.minMeasure.getRawMeasure() )
 								{
@@ -804,15 +798,11 @@ Note:			If you change or improve on this script, please let us know by
 							{
 								if ( computingColumns )
 								{
-									maxCellMeasure = GridTest
-														.intrinsicSizeCalculator
-														.calcMaxWidth(curItem.itemElement);
+									maxCellMeasure = IntrinsicSizeCalculator.calcMaxWidth(curItem.itemElement);
 								}
 								else
 								{
-									maxCellMeasure = GridTest
-														.intrinsicSizeCalculator
-														.calcMaxHeight(curItem.itemElement, curItem.usedWidthMeasure);
+									maxCellMeasure = IntrinsicSizeCalculator.calcMaxHeight(curItem.itemElement, curItem.usedWidthMeasure);
 								}
 								if ( maxCellMeasure.getRawMeasure() > curTrack.maxMeasure.getRawMeasure() )
 								{
@@ -1080,7 +1070,7 @@ Note:			If you change or improve on this script, please let us know by
 			var
 			blockProgression, trackMeasure,
 			gridElement	= this.gridElement,
-			dummyItem	= div.cloneNode(),
+			dummyItem	= div.cloneNode(TRUE),
 			cssText		= "margin:0px;border:0px;padding:0px;"
 						+ ( computingColumns ? GRIDCOLUMNALIGN : GRIDROWALIGN )
 						+ COLON + STRETCH + SEMICOL
@@ -1158,42 +1148,6 @@ Note:			If you change or improve on this script, please let us know by
 			}
 			return sum;
 		},
-		//NOT SURE WE REALLY NEED THIS - It's faked anyway
-		//adjustForTrackLengthDifferences: function ( tracks, computingColumns )
-		//{
-		//	var
-		//	gridElement = this.gridElement,
-		//	totalChange = LayoutMeasure.zero(),
-		//	i, iLen = tracks.length, track,
-		//	actualMeasure;
-		//	for ( i = 0; i < iLen; i++ )
-		//	{
-		//		track = tracks[i];
-		//		actualMeasure = this.getActualTrackMeasure( tracks[i].number, computingColumns );
-		//		if ( actualMeasure.equals( tracks[i].measure ) !== TRUE )
-		//		{
-		//			// If we are one layout pixel off, just pick up what the actual value is and consider it close enough.
-		//			if ( Math.abs( tracks[i].measure.subtract(actualMeasure).getRawMeasure() ) <= 1 )
-		//			{
-		//				// console.log( (computingColumns ? "Column" : "Row") + " " + tracks[i].number + ": " +
-		//							 "adjusting for track length difference; expected = " + 
-		//							 tracks[i].measure.getPixelValueString() + ", actual = " + 
-		//							 actualMeasure.getPixelValueString() );
-		//				totalChange.add(actualMeasure.subtract(tracks[i].measure));
-		//				tracks[i].measure = actualMeasure;
-		//			}
-		//			else
-		//			{
-		//				// Not an error; we will catch the problem later when we verify grid items.
-		//				// console.log( (computingColumns ? "Column" : "Row") + " " + tracks[i].number + ": " +
-		//							 "track length difference > 1 layout pixel; expected = " + 
-		//							 tracks[i].measure.getPixelValueString() + ", actual = " +
-		//							 actualMeasure.getPixelValueString() );
-		//			}
-		//		}
-		//	}
-		//	return totalChange;
-		//},
 		getNormalFractionMeasure: function ( track )
 		{
 			if ( ! this.trackIsFractionSized( track ) )
@@ -1282,9 +1236,9 @@ Note:			If you change or improve on this script, please let us know by
 					if ( forcedWidth === NULL ||
 						 forcedHeight === NULL )
 					{
-						curItem.shrinkToFitSize	= GridTest.intrinsicSizeCalculator.calcShrinkToFitWidthAndHeight(
+						curItem.shrinkToFitSize	= IntrinsicSizeCalculator.calcShrinkToFitWidthAndHeight(
 													curItem.itemElement, columnsBreadth, rowsBreadth, forcedWidth, forcedHeight
-													);
+												  );
 					}
 					else
 					{
@@ -1644,227 +1598,222 @@ Note:			If you change or improve on this script, please let us know by
 		}
 	},
 	
-	GridTest = {
-		
-		intrinsicSizeCalculator: {
-			zeroLength:		{ cssText: '0px' },
-			infiniteLength: { cssText: '1000000px' },
-							/* last 2 params only required for shrink-to-fit calculation */
-			prepare:		function ( element, calculatorOperation, containerWidth, containerHeight)
+	IntrinsicSizeCalculator = {
+		zeroLength:		{ cssText: '0px' },
+		infiniteLength: { cssText: '1000000px' },
+						/* last 2 params only required for shrink-to-fit calculation */
+		prepare:		function ( element, calculatorOperation, containerWidth, containerHeight)
+		{
+			if ( intrinsicSizeCalculatorElement === NULL )
 			{
-				if ( intrinsicSizeCalculatorElement === NULL )
-				{
-					 intrinsicSizeCalculatorElement = div.cloneNode();
-					 intrinsicSizeCalculatorElement.id = "intrinsicSizeCalculator";
-				}
-
-				var
-				cssText		= EMPTY,
-				gridElement = element.parentNode,
-				gridElementUsedStyle,
-				FONT		= 'font-',
-				FONTFAMILY	= FONT + 'family',
-				FONTSIZE	= FONT + 'size',
-				FONTADJUST	= FONTSIZE + '-adjust',
-				FONTSTRETCH = FONT + STRETCH,
-				FONTSTYLE	= FONT + 'style',
-				FONTVARIANT	= FONT + 'variant',
-				FONTWEIGHT	= FONT + 'weight',
-				DIRECTION	= 'direction';
-				
-				if ( ! defined( containerWidth ) &&
-					 containerWidth !== NULL )
-				{
-					cssText += WIDTH + COLON + containerWidth.getPixelValueString() + PX + SEMICOL;
-				}
-				else
-				{
-					switch (calculatorOperation)
-					{
-						case calculatorOperationEnum.minWidth:
-						case calculatorOperationEnum.maxHeight:
-							cssText += WIDTH + COLON + this.zeroLength.cssText + SEMICOL;
-							break;
-						case calculatorOperationEnum.minHeight:
-						case calculatorOperationEnum.maxWidth:
-							cssText += WIDTH + COLON + this.infiniteLength.cssText + SEMICOL;
-							break;
-						case calculatorOperationEnum.shrinkToFit:
-							// console.log("Calculating shrink to fit size without specified container width");
-							break;
-					}
-				}
-				if ( ! defined( containerHeight ) &&
-					 containerHeight !== NULL )
-				{
-					cssText += HEIGHT + COLON + containerHeight.getPixelValueString() + PX + SEMICOL;
-				}
-				else
-				{
-					switch (calculatorOperation)
-					{
-						case calculatorOperationEnum.minWidth:
-						case calculatorOperationEnum.maxHeight:
-							cssText += HEIGHT + COLON + this.infiniteLength.cssText + SEMICOL;
-							break;
-						case calculatorOperationEnum.minHeight:
-						case calculatorOperationEnum.maxWidth:
-							cssText += HEIGHT + COLON + this.zeroLength.cssText + SEMICOL;
-							break;
-						case calculatorOperationEnum.shrinkToFit:
-							// console.log("Calculating shrink to fit size without specified container height");
-							break;
-					}
-				}
-				
-				/* Insert our calculator at the same level as the grid to ensure child selectors work as well as we can reasonably achieve.
-				 * Special case: the grid is the body element.
-				 * In that case, put the calculator under the grid anyway;
-				 * it shouldn't impact calculations assuming selectors aren't impacted.
-				 **/
-				intrinsicSizeCalculatorElementParent = gridElement === document.body ? gridElement : gridElement.parentNode;
-			
-				// Copy styles from the grid to the calculator to ensure any values that are inherited by grid items still happens.
-				// TODO: add additional properties if new test content requires it.
-				if ( intrinsicSizeCalculatorElementParent !== gridElement )
-				{
-					// gridElementUsedStyle = WINDOW.getComputedStyle( gridElement, NULL );
-					
-					cssText +=	FONTFAMILY + COLON + getCSSValue( gridElement, FONTFAMILY ) + SEMICOL
-							+	FONTSIZE + COLON + getCSSValue( gridElement, FONTSIZE ) + SEMICOL
-							+ 	FONTADJUST + COLON + getCSSValue( gridElement, FONTADJUST ) + SEMICOL
-							+ 	FONTSTRETCH + COLON + getCSSValue( gridElement, FONTSTRETCH ) + SEMICOL
-							+ 	FONTSTYLE + COLON + getCSSValue( gridElement, FONTSTYLE ) + SEMICOL
-							+ 	FONTVARIANT + COLON + getCSSValue( gridElement, FONTVARIANT ) + SEMICOL
-							+ 	FONTWEIGHT + COLON + getCSSValue( gridElement, FONTWEIGHT ) + SEMICOL
-							+ 	DIRECTION + COLON + getCSSValue( gridElement, DIRECTION ) + SEMICOL
-							+ 	BLOCKPROGRESSION + COLON + getCSSValue( gridElement, BLOCKPROGRESSION) + SEMICOL;
-				}
-				intrinsicSizeCalculatorElement.style.cssText += cssText;
-				intrinsicSizeCalculatorElementParent.appendChild(intrinsicSizeCalculatorElement);
-			},
-			unprepare: function()
-			{
-				intrinsicSizeCalculatorElementParent.removeChild(intrinsicSizeCalculatorElement);
-			},
-			cloneAndAppendToCalculator: function(element)
-			{
-				var clone = element.cloneNode(TRUE);
-				// Float it so that the box won't constrain itself to the parent's size.
-				clone.style.cssText = clone.style.cssText + SEMICOL + "float:left";
-				intrinsicSizeCalculatorElement.appendChild(clone);
-				return clone;
-			},
-			calcMinWidth: function(element)
-			{
-				this.prepare(element, calculatorOperationEnum.minWidth);
-			
-				var
-				clone	= this.cloneAndAppendToCalculator(element),
-				width	= BoxSizeCalculator.calcMarginBoxWidth( clone );
-			
-				intrinsicSizeCalculatorElement.removeChild(clone);
-				this.unprepare();
-			
-				return width;
-			},
-			calcMaxWidth: function (element)
-			{
-				this.prepare(element, calculatorOperationEnum.maxWidth);
-			
-				var
-				clone	= this.cloneAndAppendToCalculator(element),
-				width	= BoxSizeCalculator.calcMarginBoxWidth( clone );
-			
-				intrinsicSizeCalculatorElement.removeChild(clone);
-				this.unprepare();
-			
-				return width;
-			},
-			calcMinHeight: function (element, usedWidth)
-			{
-				if ( defined( usedWidth ) ||
-					 usedWidth === NULL )
-				{
-					// console.log("calcMinHeight: no usedWidth specified");
-				}
-			
-				this.prepare( element, calculatorOperationEnum.minHeight, usedWidth );
-			
-				var
-				clone	= this.cloneAndAppendToCalculator(element),
-				height	= BoxSizeCalculator.calcMarginBoxHeight( clone );
-			
-				intrinsicSizeCalculatorElement.removeChild(clone);
-				this.unprepare();
-			
-				return height;
-			},
-			calcMaxHeight: function (element, usedWidth)
-			{
-				if ( defined( usedWidth ) ||
-					 usedWidth === NULL )
-				{
-					// console.log("calcMaxHeight: no usedWidth specified");
-				}
-			
-				this.prepare(element, calculatorOperationEnum.maxHeight, usedWidth);
-			
-				var
-				clone	= this.cloneAndAppendToCalculator(element),
-				height	= BoxSizeCalculator.calcMarginBoxHeight( clone );
-			
-				intrinsicSizeCalculatorElement.removeChild(clone);
-				this.unprepare();
-			
-				return height;
-			},
-			calcShrinkToFitWidthAndHeight: function ( element, containerWidth, containerHeight, forcedMarginBoxWidth, forcedMarginBoxHeight )
-			{
-				// If we're forcing a specific size on the grid item, adjust the calculator's container size to accomodate it.
-				if ( forcedMarginBoxWidth !== NULL )
-				{
-					containerWidth = forcedMarginBoxWidth;
-				}
-				if ( forcedMarginBoxHeight !== NULL )
-				{
-					containerHeight = forcedMarginBoxHeight;
-				}
-			
-				this.prepare(element, calculatorOperationEnum.shrinkToFit, containerWidth, containerHeight);
-			
-				var
-				clone						= this.cloneAndAppendToCalculator(element),
-				cloneUsedStyle				= WINDOW.getComputedStyle(clone, NULL),
-				shrinkToFitWidthAndHeight	= new WidthAndHeight(),
-				forcedWidth, forcedHeight;
-			
-				/* Force a width or height for width/height if requested.
-				 * We don't want to change the box-sizing on the box since we are not 
-				 * overriding all of the border/padding/width/height properties and
-				 * want the original values to work correctly. Convert the specified 
-				 * forced length to the appropriate length for the width/height property.
-				 **/
-				if ( forcedMarginBoxWidth !== NULL )
-				{
-					forcedWidth = BoxSizeCalculator.calcBoxWidthFromMarginBoxWidth( clone, forcedMarginBoxWidth);
-					clone.style.cssText +=	MIN + WIDTH + COLON + forcedWidth.getPixelValueString() + PX + SEMICOL +
-											MAX + WIDTH + COLON + forcedWidth.getPixelValueString() + PX + SEMICOL;
-				}
-				if ( forcedMarginBoxHeight !== NULL )
-				{
-					forcedHeight = BoxSizeCalculator.calcBoxHeightFromMarginBoxHeight( clone, forcedMarginBoxHeight);
-					clone.style.cssText +=	MIN + HEIGHT + COLON + forcedHeight.getPixelValueString() + PX + SEMICOL +
-											MAX + HEIGHT + COLON + forcedHeight.getPixelValueString() + PX + SEMICOL;
-				}
-				shrinkToFitWidthAndHeight.width		= BoxSizeCalculator.calcMarginBoxWidth( clone );
-				shrinkToFitWidthAndHeight.height	= BoxSizeCalculator.calcMarginBoxHeight( clone );
-			
-				intrinsicSizeCalculatorElement.removeChild(clone);
-				this.unprepare();
-			
-				return shrinkToFitWidthAndHeight;
+				 intrinsicSizeCalculatorElement = div.cloneNode(TRUE);
+				 intrinsicSizeCalculatorElement.id = "intrinsicSizeCalculator";
 			}
+
+			var
+			cssText		= EMPTY,
+			gridElement = element.parentNode,
+			gridElementUsedStyle,
+			FONT		= 'font-',
+			FONTFAMILY	= FONT + 'family',
+			FONTSIZE	= FONT + 'size',
+			FONTADJUST	= FONTSIZE + '-adjust',
+			FONTSTRETCH = FONT + STRETCH,
+			FONTSTYLE	= FONT + 'style',
+			FONTVARIANT	= FONT + 'variant',
+			FONTWEIGHT	= FONT + 'weight',
+			DIRECTION	= 'direction';
+			
+			if ( ! defined( containerWidth ) &&
+				 containerWidth !== NULL )
+			{
+				cssText += WIDTH + COLON + containerWidth.getPixelValueString() + PX + SEMICOL;
+			}
+			else
+			{
+				switch (calculatorOperation)
+				{
+					case calculatorOperationEnum.minWidth:
+					case calculatorOperationEnum.maxHeight:
+						cssText += WIDTH + COLON + this.zeroLength.cssText + SEMICOL;
+						break;
+					case calculatorOperationEnum.minHeight:
+					case calculatorOperationEnum.maxWidth:
+						cssText += WIDTH + COLON + this.infiniteLength.cssText + SEMICOL;
+						break;
+					case calculatorOperationEnum.shrinkToFit:
+						// console.log("Calculating shrink to fit size without specified container width");
+						break;
+				}
+			}
+			if ( ! defined( containerHeight ) &&
+				 containerHeight !== NULL )
+			{
+				cssText += HEIGHT + COLON + containerHeight.getPixelValueString() + PX + SEMICOL;
+			}
+			else
+			{
+				switch (calculatorOperation)
+				{
+					case calculatorOperationEnum.minWidth:
+					case calculatorOperationEnum.maxHeight:
+						cssText += HEIGHT + COLON + this.infiniteLength.cssText + SEMICOL;
+						break;
+					case calculatorOperationEnum.minHeight:
+					case calculatorOperationEnum.maxWidth:
+						cssText += HEIGHT + COLON + this.zeroLength.cssText + SEMICOL;
+						break;
+					case calculatorOperationEnum.shrinkToFit:
+						// console.log("Calculating shrink to fit size without specified container height");
+						break;
+				}
+			}
+			
+			/* Insert our calculator at the same level as the grid to ensure child selectors work as well as we can reasonably achieve.
+			 * Special case: the grid is the body element.
+			 * In that case, put the calculator under the grid anyway;
+			 * it shouldn't impact calculations assuming selectors aren't impacted.
+			 **/
+			intrinsicSizeCalculatorElementParent = gridElement === document.body ? gridElement : gridElement.parentNode;
+		
+			// Copy styles from the grid to the calculator to ensure any values that are inherited by grid items still happens.
+			// TODO: add additional properties if new test content requires it.
+			if ( intrinsicSizeCalculatorElementParent !== gridElement )
+			{
+				cssText +=	FONTFAMILY + COLON + getCSSValue( gridElement, FONTFAMILY ) + SEMICOL
+						+	FONTSIZE + COLON + getCSSValue( gridElement, FONTSIZE ) + SEMICOL
+						+ 	FONTADJUST + COLON + getCSSValue( gridElement, FONTADJUST ) + SEMICOL
+						+ 	FONTSTRETCH + COLON + getCSSValue( gridElement, FONTSTRETCH ) + SEMICOL
+						+ 	FONTSTYLE + COLON + getCSSValue( gridElement, FONTSTYLE ) + SEMICOL
+						+ 	FONTVARIANT + COLON + getCSSValue( gridElement, FONTVARIANT ) + SEMICOL
+						+ 	FONTWEIGHT + COLON + getCSSValue( gridElement, FONTWEIGHT ) + SEMICOL
+						+ 	DIRECTION + COLON + getCSSValue( gridElement, DIRECTION ) + SEMICOL
+						+ 	BLOCKPROGRESSION + COLON + getCSSValue( gridElement, BLOCKPROGRESSION) + SEMICOL;
+			}
+			intrinsicSizeCalculatorElement.style.cssText += cssText;
+			intrinsicSizeCalculatorElementParent.appendChild(intrinsicSizeCalculatorElement);
+		},
+		unprepare: function()
+		{
+			intrinsicSizeCalculatorElementParent.removeChild(intrinsicSizeCalculatorElement);
+		},
+		cloneAndAppendToCalculator: function(element)
+		{
+			var clone = element.cloneNode(TRUE);
+			// Float it so that the box won't constrain itself to the parent's size.
+			clone.style.cssText = clone.style.cssText + SEMICOL + "float:left";
+			intrinsicSizeCalculatorElement.appendChild(clone);
+			return clone;
+		},
+		calcMinWidth: function(element)
+		{
+			this.prepare(element, calculatorOperationEnum.minWidth);
+		
+			var
+			clone	= this.cloneAndAppendToCalculator(element),
+			width	= BoxSizeCalculator.calcMarginBoxWidth( clone );
+		
+			intrinsicSizeCalculatorElement.removeChild(clone);
+			this.unprepare();
+		
+			return width;
+		},
+		calcMaxWidth: function (element)
+		{
+			this.prepare(element, calculatorOperationEnum.maxWidth);
+		
+			var
+			clone	= this.cloneAndAppendToCalculator(element),
+			width	= BoxSizeCalculator.calcMarginBoxWidth( clone );
+		
+			intrinsicSizeCalculatorElement.removeChild(clone);
+			this.unprepare();
+		
+			return width;
+		},
+		calcMinHeight: function (element, usedWidth)
+		{
+			if ( defined( usedWidth ) ||
+				 usedWidth === NULL )
+			{
+				// console.log("calcMinHeight: no usedWidth specified");
+			}
+		
+			this.prepare( element, calculatorOperationEnum.minHeight, usedWidth );
+		
+			var
+			clone	= this.cloneAndAppendToCalculator(element),
+			height	= BoxSizeCalculator.calcMarginBoxHeight( clone );
+		
+			intrinsicSizeCalculatorElement.removeChild(clone);
+			this.unprepare();
+		
+			return height;
+		},
+		calcMaxHeight: function (element, usedWidth)
+		{
+			if ( defined( usedWidth ) ||
+				 usedWidth === NULL )
+			{
+				// console.log("calcMaxHeight: no usedWidth specified");
+			}
+		
+			this.prepare(element, calculatorOperationEnum.maxHeight, usedWidth);
+		
+			var
+			clone	= this.cloneAndAppendToCalculator(element),
+			height	= BoxSizeCalculator.calcMarginBoxHeight( clone );
+		
+			intrinsicSizeCalculatorElement.removeChild(clone);
+			this.unprepare();
+		
+			return height;
+		},
+		calcShrinkToFitWidthAndHeight: function ( element, containerWidth, containerHeight, forcedMarginBoxWidth, forcedMarginBoxHeight )
+		{
+			// If we're forcing a specific size on the grid item, adjust the calculator's container size to accomodate it.
+			if ( forcedMarginBoxWidth !== NULL )
+			{
+				containerWidth = forcedMarginBoxWidth;
+			}
+			if ( forcedMarginBoxHeight !== NULL )
+			{
+				containerHeight = forcedMarginBoxHeight;
+			}
+		
+			this.prepare(element, calculatorOperationEnum.shrinkToFit, containerWidth, containerHeight);
+		
+			var
+			clone						= this.cloneAndAppendToCalculator(element),
+			cloneUsedStyle				= WINDOW.getComputedStyle(clone, NULL),
+			shrinkToFitWidthAndHeight	= new WidthAndHeight(),
+			forcedWidth, forcedHeight;
+		
+			/* Force a width or height for width/height if requested.
+			 * We don't want to change the box-sizing on the box since we are not 
+			 * overriding all of the border/padding/width/height properties and
+			 * want the original values to work correctly. Convert the specified 
+			 * forced length to the appropriate length for the width/height property.
+			 **/
+			if ( forcedMarginBoxWidth !== NULL )
+			{
+				forcedWidth = BoxSizeCalculator.calcBoxWidthFromMarginBoxWidth( clone, forcedMarginBoxWidth);
+				clone.style.cssText +=	MIN + WIDTH + COLON + forcedWidth.getPixelValueString() + PX + SEMICOL +
+										MAX + WIDTH + COLON + forcedWidth.getPixelValueString() + PX + SEMICOL;
+			}
+			if ( forcedMarginBoxHeight !== NULL )
+			{
+				forcedHeight = BoxSizeCalculator.calcBoxHeightFromMarginBoxHeight( clone, forcedMarginBoxHeight);
+				clone.style.cssText +=	MIN + HEIGHT + COLON + forcedHeight.getPixelValueString() + PX + SEMICOL +
+										MAX + HEIGHT + COLON + forcedHeight.getPixelValueString() + PX + SEMICOL;
+			}
+			shrinkToFitWidthAndHeight.width		= BoxSizeCalculator.calcMarginBoxWidth( clone );
+			shrinkToFitWidthAndHeight.height	= BoxSizeCalculator.calcMarginBoxHeight( clone );
+		
+			intrinsicSizeCalculatorElement.removeChild(clone);
+			this.unprepare();
+		
+			return shrinkToFitWidthAndHeight;
 		}
 	},
 	
