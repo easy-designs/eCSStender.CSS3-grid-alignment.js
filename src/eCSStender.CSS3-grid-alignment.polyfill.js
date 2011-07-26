@@ -1,8 +1,12 @@
 /*------------------------------------------------------------------------------
 Function:		eCSStender.CSS3-grid-alignment.polyfill.js
 Author:			Aaron Gustafson (aaron at easy-designs dot net)
+Creation Date:	2011-06-23
+Version:		0.1
 Homepage:		http://github.com/easy-designs/eCSStender.CSS3-grid-alignment.js
 License:		MIT License 
+Note:			If you change or improve on this script, please let us know by
+				emailing the author (above) with a link to your demo page.
 ------------------------------------------------------------------------------*/
 (function(e){
 	
@@ -74,6 +78,7 @@ License:		MIT License
 
 	regexSpaces = /\s+/,
 	div			= document.createElement('div'),
+	intrinsicSizeCalculatorElement			= NULL,
 	intrinsicSizeCalculatorElementParent	= NULL,
 	
 	calculatorOperationEnum	= {
@@ -119,6 +124,13 @@ License:		MIT License
 	function defined( test )
 	{
 		return test != UNDEFINED;
+	}
+	
+	function createBoundedWrapper( object, method )
+	{
+	  return function() {
+	    return method.apply(object, arguments);
+	  };
 	}
 	
 	function WidthAndHeight()
@@ -308,7 +320,7 @@ License:		MIT License
 		{
 			var
 			gridElement			= this.gridElement,
-			dummy				= gridElement.cloneNode(TRUE),
+			dummy				= gridElement.cloneNode(FALSE),
 			gridProperties		= this.properties,
 			gridElementParent	= gridElement.parentNode,
 			isInlineGrid,
@@ -337,7 +349,6 @@ License:		MIT License
 			// in that case, we are a block element and take up all available width.
 			// TODO: ensure we do the right thing for floats.
 			// need to remove the content to ensure we get the right height
-			dummy.innerHTML = EMPTY;
 			gridElementParent.insertBefore( dummy, gridElement );
 			width = getCSSValue( dummy, WIDTH );
 			if ( width == zero ){ width = AUTO; }
@@ -685,7 +696,7 @@ License:		MIT License
 			curSpanningItem, firstTrack, numSpanned, sumOfTrackMeasures, measureSpanCanGrow,
 			sumOfFractions, oneFractionMeasure, totalMeasureToAdd,
 			lastNormalizedFractionalMeasure, accumulatedFactors, accumulatedFactorsInDistributionSet,
-			normalizedDelta, j, spaceToDistribute;
+			normalizedDelta, j, spaceToDistribute, sortFunc;
 
 			if ( useAlternateFractionalSizing &&
 				 availableSpace.getRawMeasure() == 0 )
@@ -881,7 +892,8 @@ License:		MIT License
 			remainingSpace = availableSpace.subtract( this.getSumOfTrackMeasures( trackManager ) );
 			if ( remainingSpace.getRawMeasure() > 0 )
 			{
-				autoTracks.sort( this.compareAutoTracksAvailableGrowth );
+				sortFunc = createBoundedWrapper( this, this.compareAutoTracksAvailableGrowth );
+				autoTracks.sort( sortFunc );
 
 				for ( autoTrackIndex=0, autoTrackLength=autoTracks.length; autoTrackIndex < autoTrackLength; autoTrackIndex++ )
 				{
@@ -951,7 +963,8 @@ License:		MIT License
 				{
 					// console.log("remaining space for fractional sizing = " + remainingSpace.getPixelValueString());
 				}
-				fractionalTracks.sort(this.compareFractionTracksNormalMeasure);
+				sortFunc = createBoundedWrapper( this, this.compareFractionTracksNormalMeasure );
+				fractionalTracks.sort( sortFunc );
 				sumOfFractions = 0;
 				for ( i=0, iLen=fractionalTracks.length; i < iLen; i++ )
 				{
@@ -1153,6 +1166,38 @@ License:		MIT License
 			var frValue = track.size.value;
 			return frValue === 0 ? LayoutMeasure.zero() : track.measure.divide(frValue);
 		},
+        compareFractionTracksNormalMeasure: function ( a, b )
+		{
+            var
+			result					= 0,
+			// Called from a sort function; can't depend on "this" object being CSSGridAlignment.
+            normalFractionMeasureA	= this.getNormalFractionMeasure( a ),
+			normalFractionMeasureB	= this.getNormalFractionMeasure( b );
+			if ( defined( a ) &&
+				 defined( b ) )
+			{
+	            if ( normalFractionMeasureA.getRawMeasure() < normalFractionMeasureB.getRawMeasure() )
+				{
+	                result = -1;
+	            }
+	            else if ( normalFractionMeasureA.getRawMeasure() > normalFractionMeasureB.getRawMeasure() )
+				{
+	                result = 1;
+	            }
+	            else
+				{
+	                if ( a.size.value > b.size.value )
+					{
+	                    result = -1;
+	                }
+	                else if ( a.size.value < b.size.value )
+					{
+	                    result = 1;
+	                }
+	            }
+			}
+            return result;
+        },
 		determineMeasureOfOneFractionUnconstrained: function ( fractionalTracks )
 		{
 		    // Iterate over all of the fractional tracks, 
@@ -1661,7 +1706,7 @@ License:		MIT License
 						break;
 				}
 			}
-			if ( ! defined( containerHeight ) &&
+			if ( defined( containerHeight ) &&
 				 containerHeight !== NULL )
 			{
 				cssText += HEIGHT + COLON + containerHeight.getPixelValueString() + PX + SEMICOL;
@@ -2479,7 +2524,7 @@ License:		MIT License
 			// Fractional tracks are always represented by actual track objects.
 			for ( var i = firstTrackNum-1, len=this.tracks.length; i < len && i < (firstTrackNum + numSpanned - 1); i++ )
 			{
-				if ( GridTest.trackIsFractionSized( this.tracks[i] ) )
+				if ( this.trackIsFractionSized( this.tracks[i] ) )
 				{
 					return TRUE;
 				}
