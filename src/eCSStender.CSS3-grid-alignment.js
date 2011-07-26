@@ -2,7 +2,7 @@
 Function:		eCSStender.CSS3-grid-alignment.js
 Author:			Aaron Gustafson (aaron at easy-designs dot net)
 Creation Date:	2011-06-23
-Version:		0.1
+Version:		0.2
 Homepage:		http://github.com/easy-designs/eCSStender.CSS3-grid-alignment.js
 License:		MIT License 
 Note:			If you change or improve on this script, please let us know by
@@ -29,7 +29,8 @@ Note:			If you change or improve on this script, please let us know by
 	DISPLAY		= 'display',
 	GRID		= 'grid',
 	isSupported	= e.isSupported,
-	native_support, prefixed_support, folder;
+	native_support, prefixed_support, folder,
+	polyfill_loaded = false;
 	
 	if ( native_support = isSupported( PROPERTY, DISPLAY + COLON + GRID ) )
 	{
@@ -48,7 +49,10 @@ Note:			If you change or improve on this script, please let us know by
 	if ( ! prefixed_support )
 	{
 		folder = e.getPathTo( 'eCSStender.CSS3-grid-alignment.js' );
-		e.loadScript( folder + 'eCSStender.CSS3-grid-alignment.polyfill.js' );
+		e.loadScript(
+			folder + 'eCSStender.CSS3-grid-alignment.polyfill.js',
+			function(){ polyfill_loaded = TRUE; }
+		);
 	}
 
 	function defined( test )
@@ -160,8 +164,16 @@ Note:			If you change or improve on this script, please let us know by
 			else
 			{
 				collection = e.lookup( { fragment: GRID }, STAR );
-				function gridify( selector, properties, media, specificity )
+				function polyfill( selector, properties, media, specificity )
 				{
+					if ( ! polyfill_loaded )
+					{
+						setTimeout(function(){
+							polyfill(selector, properties, media, specificity);
+						},100);
+						return;
+					}
+					
 					var
 					els		= select( selector ),
 					eLen	= els.length,
@@ -203,8 +215,8 @@ Note:			If you change or improve on this script, please let us know by
 				}
 
 				// trigger the actual function and re-define the callback
-				gridify( selector, properties, media, specificity );
-				return gridify;
+				polyfill( selector, properties, media, specificity );
+				return polyfill;
 			}
 		}
 	);

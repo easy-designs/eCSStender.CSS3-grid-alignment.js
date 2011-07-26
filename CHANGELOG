@@ -1,3 +1,7 @@
+*v0.2* (2011-07-26)
+
+* Refactored extension file to ensure the Polyfill library is available is needed before attempting to execute a polyfill
+
 *v0.1* (2011-07-24)
 
 * Basic Grid Alignment working in the following modern browsers: Chrome, Firefox, Internet Explorer, & Safari (Opera still needs work)
