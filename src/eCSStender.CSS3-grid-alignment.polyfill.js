@@ -208,10 +208,8 @@ Note:			If you change or improve on this script, please let us know by
 			styles		= EMPTY,
 			gridstyles	= EMPTY,
 			height		= 0,
-			calcHeight	= ( this.availableSpaceForRows.internalMeasure < 1 ),
-			rows		= this.rowTrackManager.tracks,
 			width		= 0,
-			calcWidth	= ( this.availableSpaceForColumns.internalMeasure < 1 ),
+			rows		= this.rowTrackManager.tracks,
 			cols		= this.columnTrackManager.tracks;
 
 			while ( i-- )
@@ -230,33 +228,23 @@ Note:			If you change or improve on this script, please let us know by
 				styles += CLOSE_CURLY;
 			}
 
-			// console.log(getCSSValue( this.gridElement, POSITION ));
 			if ( getCSSValue( this.gridElement, POSITION ) == STATIC )
 			{
 				gridstyles += POSITION + COLON + RELATIVE + SEMICOL;
 			}
-			if ( calcHeight )
-			{ 
-				i = rows.length;
-				while ( i-- )
-				{
-					height += rows[i].measure.internalMeasure;
-				}
-				gridstyles += HEIGHT + COLON + height + PX + SEMICOL;
-			}
-			if ( calcWidth )
-			{ 
-				i = cols.length;
-				while ( i-- )
-				{
-					width += cols[i].measure.internalMeasure;
-				}
-				gridstyles += WIDTH + COLON + width + PX + SEMICOL;
-			}
-			if ( gridstyles != EMPTY )
+			i = rows.length;
+			while ( i-- )
 			{
-				styles += this.selector + OPEN_CURLY + gridstyles + CLOSE_CURLY;
+				height += rows[i].measure.getRawMeasure();	
 			}
+			gridstyles += HEIGHT + COLON + height + PX + SEMICOL;
+			i = cols.length;
+			while ( i-- )
+			{
+				width += cols[i].measure.getRawMeasure();
+			}
+			gridstyles += WIDTH + COLON + width + PX + SEMICOL;
+			styles += this.selector + OPEN_CURLY + gridstyles + CLOSE_CURLY;
 
 			// console.log(styles);
 			e.embedCSS( styles, this.media );
@@ -292,17 +280,21 @@ Note:			If you change or improve on this script, please let us know by
 			sides		= [TOP,RIGHT,BOTTOM,LEFT],
 			s			= sides.length;
 			dimensions	= {
-				height:	dimensions.height.internalMeasure,
-				width:	dimensions.width.internalMeasure
+				height:	dimensions.height.getRawMeasure(),
+				width:	dimensions.width.getRawMeasure()
 			};
 			while ( s-- )
 			{
-				margins[sides[s]] = parseInt( getCSSValue( element, MARGIN + HYPHEN + sides[s] ), 10 );
-				padding[sides[s]] = parseInt( getCSSValue( element, PADDING + HYPHEN + sides[s] ), 10 );
-				borders[sides[s]] = parseInt( getCSSValue( element, BORDER + HYPHEN + sides[s] + HYPHEN + WIDTH ), 10 );
+				margins[sides[s]] = LayoutMeasure.measureFromStyleProperty( element, MARGIN + HYPHEN + sides[s] );
+				padding[sides[s]] = LayoutMeasure.measureFromStyleProperty( element, PADDING + HYPHEN + sides[s] );
+				borders[sides[s]] = LayoutMeasure.measureFromStyleProperty( element, BORDER + HYPHEN + sides[s] + HYPHEN + WIDTH );
 			}
-			dimensions.height -= ( margins.top + margins.bottom + padding.top + padding.bottom + borders.top + borders.bottom );
-			dimensions.width -= ( margins.left + margins.right + padding.left + padding.right + borders.left + borders.right );
+			dimensions.height -= ( margins.top.getRawMeasure() + margins.bottom.getRawMeasure() +
+			 					   padding.top.getRawMeasure() + padding.bottom.getRawMeasure() +
+			 					   borders.top.getRawMeasure() + borders.bottom.getRawMeasure() );
+			dimensions.width -= ( margins.left.getRawMeasure() + margins.right.getRawMeasure() +
+			 					  padding.left.getRawMeasure() + padding.right.getRawMeasure() + 
+								  borders.left.getRawMeasure() + borders.right.getRawMeasure() );
 			return dimensions;
 		},
 		/* Determines the available space for the grid by:
@@ -327,21 +319,21 @@ Note:			If you change or improve on this script, please let us know by
 			zero	= '0px',
 			sides	= [TOP,RIGHT,BOTTOM,LEFT],
 			s		= sides.length,
-			margins = {}, padding = {}, borders = {}, innerHTML, width, height,
+			margins = {}, padding = {}, borders = {}, innerHTML, width, height, floated,
 			widthToUse, heightToUse, marginToUse, borderWidthToUse, borderStyleToUse, paddingToUse,
 			cssText, scrollWidth, scrollHeight, removedElement,
 			widthAdjustment, heightAdjustment, widthMeasure, heightMeasure, widthAdjustmentMeasure, heightAdjustmentMeasure;
-
+			
 			// we need to get grid props from the passed styles
 			isInlineGrid = gridProperties.display === INLINEGRID ? TRUE : FALSE;
-
+			
 			// Get each individual margin, border, and padding value for
 			// using with calc() when specifying the width/height of the dummy element.
 			while ( s-- )
 			{
-				margins[sides[s]] = getCSSValue( gridElement, MARGIN + HYPHEN + sides[s] );
-				padding[sides[s]] = getCSSValue( gridElement, PADDING + HYPHEN + sides[s] );
-				borders[sides[s]] = getCSSValue( gridElement, BORDER + HYPHEN + sides[s] + HYPHEN + WIDTH );
+				margins[sides[s]] = LayoutMeasure.measureFromStyleProperty( gridElement, MARGIN + HYPHEN + sides[s] );
+				padding[sides[s]] = LayoutMeasure.measureFromStyleProperty( gridElement, PADDING + HYPHEN + sides[s] );
+				borders[sides[s]] = LayoutMeasure.measureFromStyleProperty( gridElement, BORDER + HYPHEN + sides[s] + HYPHEN + WIDTH );
 			}
 
 			// If the grid has an explicit width and/or height, that determines the available space for the tracks.
@@ -350,10 +342,13 @@ Note:			If you change or improve on this script, please let us know by
 			// TODO: ensure we do the right thing for floats.
 			// need to remove the content to ensure we get the right height
 			gridElementParent.insertBefore( dummy, gridElement );
-			width = getCSSValue( dummy, WIDTH );
+			width	= getCSSValue( dummy, WIDTH );
+			floated	= getCSSValue( gridElement, 'float' );
 			if ( width == zero ){ width = AUTO; }
 			if ( width == AUTO &&
-			 	 ( isInlineGrid || getCSSValue( gridElement, 'float' ) !== NONE ) )
+			 	 ( isInlineGrid ||
+				   floated === LEFT ||
+				   floated === RIGHT ) )
 			{
 				this.useAlternateFractionalSizingForColumns = TRUE;
 			}
@@ -369,9 +364,9 @@ Note:			If you change or improve on this script, please let us know by
 			// build the straw man for getting dimensions
 			dummy = document.createElement( gridElement.tagName );
 			widthToUse	= width !== AUTO	? width
-											: this.determineSize( WIDTH, margins, padding, borders );
+											: this.determineSize( WIDTH, margins, padding, borders ) + PX;
 			heightToUse = height !== AUTO ? height
-											: this.determineSize( HEIGHT, margins, padding, borders );
+											: this.determineSize( HEIGHT, margins, padding, borders ) + PX;
 			cssText = DISPLAY + COLON + ( ! isInlineGrid ? "block" : "inline-block" ) + SEMICOL
 					+ MARGIN + COLON + getCSSValue( gridElement, MARGIN ) + SEMICOL
 					+ BORDER + HYPHEN + WIDTH + COLON + getCSSValue( gridElement, BORDER + HYPHEN + WIDTH ) + SEMICOL
@@ -397,9 +392,8 @@ Note:			If you change or improve on this script, please let us know by
 			removedElement = gridElementParent.removeChild(gridElement);
 
 			// The dummy item should never add scrollbars if the grid element didn't.
-			widthAdjustment		= width !== AUTO ? 0 : scrollWidth - this.verticalScrollbarWidth();
-			heightAdjustment	= height !== AUTO ? 0 : scrollHeight - this.horizontalScrollbarHeight();
-
+			widthAdjustment			= width !== AUTO ? 0 : scrollWidth - this.verticalScrollbarWidth();
+			heightAdjustment		= height !== AUTO ? 0 : scrollHeight - this.horizontalScrollbarHeight();
 			// get the final measurements
 			widthMeasure			= LayoutMeasure.measureFromStyleProperty( dummy, WIDTH );
 			heightMeasure			= LayoutMeasure.measureFromStyleProperty( dummy, HEIGHT );
@@ -417,7 +411,7 @@ Note:			If you change or improve on this script, please let us know by
 				this.availableSpaceForColumns	= heightMeasure.subtract(heightAdjustmentMeasure);
 				this.availableSpaceForRows		= widthMeasure.subtract(widthAdjustmentMeasure);
 			}
-
+			
 			// Restore the DOM.
 			gridElementParent.insertBefore( removedElement, dummy );
 			gridElementParent.removeChild( dummy );
@@ -425,18 +419,19 @@ Note:			If you change or improve on this script, please let us know by
 		determineSize: function ( dimension, margins, padding, borders )
 		{
 			var
-			parent = this.gridElement.parentNode,
-			one	   = dimension == WIDTH ? LEFT : TOP,
-			two	   = dimension == WIDTH ? RIGHT : BOTTOM,
-			size   = dimension == WIDTH ? parent.offsetWidth : parent.offsetHeight;
-			size  -= getCSSValue( parent, BORDER + HYPHEN + one );
-			size  -= getCSSValue( parent, PADDING + HYPHEN + one );
-			size  -= getCSSValue( parent, PADDING + HYPHEN + two );
-			size  -= getCSSValue( parent, BORDER + HYPHEN + two );
-			size  -= ( margins[one] + margins[two] );
-			size  -= ( borders[one] + borders[two] );
-			size  -= ( padding[one] + padding[two] );
-			// console.log('size: ' +size);
+			parent	= this.gridElement.parentNode,
+			one		= dimension == WIDTH ? LEFT : TOP,
+			two		= dimension == WIDTH ? RIGHT : BOTTOM,
+			size	= dimension == WIDTH ? parent.offsetWidth : parent.offsetHeight,
+			border1	= LayoutMeasure.measureFromStyleProperty( parent, BORDER + HYPHEN + one + HYPHEN + WIDTH ),
+			border2 = LayoutMeasure.measureFromStyleProperty( parent, BORDER + HYPHEN + two + HYPHEN + WIDTH ),
+			padd1	= LayoutMeasure.measureFromStyleProperty( parent, PADDING + HYPHEN + one ),
+			padd2	= LayoutMeasure.measureFromStyleProperty( parent, PADDING + HYPHEN + two );
+			size -= ( border1.getRawMeasure() + border2.getRawMeasure() +
+					  padd1.getRawMeasure() + padd2.getRawMeasure() +
+					  margins[one].getRawMeasure() + margins[two].getRawMeasure() +
+					  borders[one].getRawMeasure() + borders[two].getRawMeasure() +
+					  padding[one].getRawMeasure() + padding[two].getRawMeasure() );
 			return size;
 		},
 		verticalScrollbarWidth: function()
@@ -697,7 +692,7 @@ Note:			If you change or improve on this script, please let us know by
 			sumOfFractions, oneFractionMeasure, totalMeasureToAdd,
 			lastNormalizedFractionalMeasure, accumulatedFactors, accumulatedFactorsInDistributionSet,
 			normalizedDelta, j, spaceToDistribute, sortFunc;
-
+			
 			if ( useAlternateFractionalSizing &&
 				 availableSpace.getRawMeasure() == 0 )
 			{
@@ -936,7 +931,7 @@ Note:			If you change or improve on this script, please let us know by
 				sumOfTrackMeasures	= this.getSumOfSpannedTrackMeasures(trackManager, firstTrack, numSpanned);
 				measureSpanCanGrow	= (computingColumns === TRUE ? curSpanningItem.maxWidthMeasure
 																 : curSpanningItem.maxHeightMeasure).subtract(sumOfTrackMeasures);
-
+				
 				if ( measureSpanCanGrow.getRawMeasure() > 0 )
 				{
 					// Redistribute among all content-sized tracks that this span is a member of.
@@ -2002,6 +1997,7 @@ Note:			If you change or improve on this script, please let us know by
 		if ( measure % 1 !== 0 )
 		{
 			// console.log("LayoutMeasures must be integers, measure was " + typeof(measure) + "(" + measure + ")" );
+			measure = 0;
 		}
 		this.internalMeasure = measure;
 	}
@@ -2057,49 +2053,6 @@ Note:			If you change or improve on this script, please let us know by
 		getRawMeasure: function()
 		{
 			return this.internalMeasure;
-		},
-		getPixelValueString: function()
-		{
-			var
-			abs = Math.abs,
-			pow = Mat.pow,
-			wholePixelString, internalMeasureString, fractionOfPixel, fractionOfPixelString;
-			if ( abs( this.internalMeasure ) < pow( 10, precision ) )
-			{
-				// Not a whole pixel.
-				if ( this.internalMeasure < 0 )
-				{
-					wholePixelString = HYPHEN + this.zerostring;
-				}
-				else
-				{
-					wholePixelString = this.zerostring;
-				}
-			}
-			else
-			{
-				internalMeasureString	= this.internalMeasure + EMPTY;
-				wholePixelString		= internalMeasureString.substr( 0, internalMeasureString.length - precision );
-			}
-			fractionOfPixel = abs(this.internalMeasure % pow(10, precision));
-			if ( fractionOfPixel == 0 )
-			{
-				fractionOfPixelString = EMPTY;
-			}
-			else
-			{
-				fractionOfPixelString = fractionOfPixel + EMPTY;
-			}
-			if ( fractionOfPixelString.length == 1 )
-			{
-				 fractionOfPixelString = this.zerostring + fractionOfPixelString;
-			}
-			if ( fractionOfPixelString[1] === this.zerostring )
-			{
-				// Remove trailing 0.
-				fractionOfPixelString = fractionOfPixelString[0];
-			}
-			return wholePixelString + (fractionOfPixelString.length === 0 ? EMPTY : (PERIOD + fractionOfPixelString));
 		},
 		getPixelValue: function()
 		{
