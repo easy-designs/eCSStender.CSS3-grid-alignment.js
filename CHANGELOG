@@ -1,6 +1,7 @@
 *v0.2* (2011-07-26)
 
 * Refactored extension file to ensure the Polyfill library is available is needed before attempting to execute a polyfill
+* Added Opera support
 
 *v0.1* (2011-07-24)
 

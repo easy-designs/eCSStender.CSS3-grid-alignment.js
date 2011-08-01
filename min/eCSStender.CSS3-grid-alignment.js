@@ -2,7 +2,7 @@
 Function:		eCSStender.CSS3-grid-alignment.js
 Author:			Aaron Gustafson (aaron at easy-designs dot net)
 Creation Date:	2011-06-23
-Version:		0.1
+Version:		0.2
 Homepage:		http://github.com/easy-designs/eCSStender.CSS3-grid-alignment.js
 License:		MIT License 
 Note:			If you change or improve on this script, please let us know by

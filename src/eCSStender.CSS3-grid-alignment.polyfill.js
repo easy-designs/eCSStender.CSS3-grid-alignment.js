@@ -2,7 +2,7 @@
 Function:		eCSStender.CSS3-grid-alignment.polyfill.js
 Author:			Aaron Gustafson (aaron at easy-designs dot net)
 Creation Date:	2011-06-23
-Version:		0.1
+Version:		0.2
 Homepage:		http://github.com/easy-designs/eCSStender.CSS3-grid-alignment.js
 License:		MIT License 
 Note:			If you change or improve on this script, please let us know by
@@ -54,6 +54,9 @@ Note:			If you change or improve on this script, please let us know by
 	MIN			= 'min-',
 	MAX			= 'max-',
 	PX			= 'px',
+	EM			= 'em',
+	PERCENT		= '%',
+	REM			= 'rem',
 	FR			= 'fr',
 	CONTENTBOX	= 'content-box',
 	PADDINGBOX	= 'padding-box',
@@ -113,6 +116,11 @@ Note:			If you change or improve on this script, please let us know by
 		  lr: { keyword: 'lr' },
 		  rl: { keyword: 'rl' }
 	},
+	borderWidths = {
+		  thin:		0,
+		  medium:	0,
+		  thick:	0
+	},
 	sizingTypeEnum = {
 		  valueAndUnit: {},
 		  keyword: {}
@@ -121,6 +129,11 @@ Note:			If you change or improve on this script, please let us know by
 	// aliasing eCSStender's built-ins
 	getCSSValue				= e.getCSSValue;
 
+	String.prototype.contains = function( str )
+	{
+		return ( this.indexOf(str) != -1 );
+	};
+	
 	function defined( test )
 	{
 		return test != UNDEFINED;
@@ -193,6 +206,8 @@ Note:			If you change or improve on this script, please let us know by
 
 			this.calculateGridItemShrinkToFitSizes();
 
+			this.determineBorderWidths();
+
 			//this.verifyGridItemSizes();
 			//this.verifyGridItemPositions(gridObject);
 
@@ -248,6 +263,22 @@ Note:			If you change or improve on this script, please let us know by
 
 			// console.log(styles);
 			e.embedCSS( styles, this.media );
+		},
+		determineBorderWidths: function()
+		{
+			var
+			el		= div.cloneNode(FALSE),
+			border	= BORDER + HYPHEN + RIGHT,
+			width, size;
+			DOCUMENT.body.appendChild( el );
+			el.style.width = '100px';
+			width = parseInt( el.offsetWidth, 10 );
+			for ( size in borderWidths )
+			{
+				if ( e.isInheritedProperty( borderWidths, size ) ){ continue; }
+				el.style[border]	= size + ' solid';
+				borderWidths[size]	= parseInt( el.offsetWidth, 10 ) - width;
+			}
 		},
 		getPosition: function( item )
 		{
@@ -1729,7 +1760,7 @@ Note:			If you change or improve on this script, please let us know by
 			 * In that case, put the calculator under the grid anyway;
 			 * it shouldn't impact calculations assuming selectors aren't impacted.
 			 **/
-			intrinsicSizeCalculatorElementParent = gridElement === document.body ? gridElement : gridElement.parentNode;
+			intrinsicSizeCalculatorElementParent = gridElement === DOCUMENT.body ? gridElement : gridElement.parentNode;
 		
 			// Copy styles from the grid to the calculator to ensure any values that are inherited by grid items still happens.
 			// TODO: add additional properties if new test content requires it.
@@ -1959,19 +1990,19 @@ Note:			If you change or improve on this script, please let us know by
 			switch (unit)
 			{
 				case PX:
-				case '%':
+				case PERCENT:
 				case 'pt':
 				case 'pc':
 				case 'in':
 				case 'cm':
 				case 'mm':
-				case 'em':
+				case EM:
 				case 'ex':
 				case 'vh':
 				case 'vw':
 				case 'vm':
 				case 'ch':
-				case 'rem':
+				case REM:
 				case FR: // Grid only
 					ret = TRUE;
 			}
@@ -2035,7 +2066,63 @@ Note:			If you change or improve on this script, please let us know by
 	};
 	LayoutMeasure.measureFromStyleProperty = function ( el, property )
 	{
-		return this.measureFromPxString( getCSSValue( el, property ) );
+		// TODO: handle borders with no style and keywords
+		var
+		val		= getCSSValue( el, property ),
+		found	= FALSE,
+		size, s, em, rem, percent, num;
+		if ( ! val.contains(PX) )
+		{
+			if ( property.contains('border-width') )
+			{
+				size = getCSSValue( el, 'border-style' );
+				if ( size === NONE )
+				{
+					val		= 0 + PX;
+					found	= TRUE;
+				}
+				else
+				{
+					for ( s in borderWidths )
+					{
+						if ( size == s )
+						{
+							val 	= borderWidths[s] + PX;
+							found	= TRUE;
+							break;
+						}
+					}
+				}
+			}
+			if ( ! found )
+			{
+				em		= val.contains(EM);
+				rem		= val.contains(REM);
+				percent	= val.contains(PERCENT);
+				if ( em || rem )
+				{
+					size	= parseInt( getCSSValue( ( em ? el : DOCUMENT.body ), 'font-size' ), 10 );
+					val		= ( parseInt( val, 10 ) * size ) + PX;
+				}
+				else if ( percent )
+				{
+					if ( property.contains(WIDTH) ||
+			 	 	     property.contains(LEFT) ||
+				 	     property.contains(RIGHT) )
+					{
+						s = el.parentNode.clientWidth;
+					}
+					else if ( property.contains(HEIGHT) ||
+					 	 	  property.contains(TOP) ||
+						 	  property.contains(BOTTOM) )
+					{
+						s = el.parentNode.clientHeight;
+					}
+					val		= Math.round( ( parseInt( val, 10 ) / 100 ) * s ) + PX;
+				}
+			}
+		}
+		return this.measureFromPxString( val );
 	};
 	LayoutMeasure.zero = function()
 	{
