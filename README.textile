@@ -4,7 +4,7 @@ An implementation of the CSS3 Grid Alignment module using eCSStender.
 
 h2. Current Version
 
-0.2 (2011-07-26)
+0.3 (2011-08-04)
 
 h2. Requirements
 

@@ -2,7 +2,7 @@
 Function:		eCSStender.CSS3-grid-alignment.js
 Author:			Aaron Gustafson (aaron at easy-designs dot net)
 Creation Date:	2011-06-23
-Version:		0.2
+Version:		0.3
 Homepage:		http://github.com/easy-designs/eCSStender.CSS3-grid-alignment.js
 License:		MIT License 
 Note:			If you change or improve on this script, please let us know by
@@ -28,16 +28,21 @@ Note:			If you change or improve on this script, please let us know by
 	EMPTY		= '',
 	DISPLAY		= 'display',
 	GRID		= 'grid',
+	cache		= [],
+	completed	= false,
 	isSupported	= e.isSupported,
-	native_support, prefixed_support, folder,
-	polyfill_loaded = false;
+	onComplete	= e.onComplete,
+	native_support, prefixed_support, folder;
 	
 	if ( native_support = isSupported( PROPERTY, DISPLAY + COLON + GRID ) )
 	{
-		console.log('exiting');
 		// we don't need the extension
 		return;
 	}
+	
+	onComplete(function(){
+		completed = TRUE;
+	});
 	
 	prefixed_support = ( isSupported( PROPERTY, DISPLAY + COLON + MS + GRID ) ||
 						 // moz thinks it's ready in FF 5, but it's not
@@ -45,16 +50,25 @@ Note:			If you change or improve on this script, please let us know by
 						 isSupported( PROPERTY, DISPLAY + COLON + OPERA + GRID ) ||
 						 isSupported( PROPERTY, DISPLAY + COLON + WEBKIT + GRID ) );
 
-	// load the polyfill library
-	if ( ! prefixed_support )
+	function holdGridAlignment( el, selector, properties, media, grid_items )
 	{
-		folder = e.getPathTo( 'eCSStender.CSS3-grid-alignment.js' );
-		e.loadScript(
-			folder + 'eCSStender.CSS3-grid-alignment.polyfill.js',
-			function(){ polyfill_loaded = TRUE; }
-		);
+		cache.push({
+			e: el,
+			s: selector,
+			p: properties,
+			m: media,
+			g: grid_items	
+		});
 	}
-
+	function processGrids()
+	{
+		var i = cache.length, item;
+		while ( i-- )
+		{
+			item = cache[i];
+			new CSSGridAlignment( item.e, item.s, item.p, item.m, item.g );
+		}
+	}
 	function defined( test )
 	{
 		return test != UNDEFINED;
@@ -85,6 +99,25 @@ Note:			If you change or improve on this script, please let us know by
 			};
 		}
 		return select( selector, context );
+	}
+	
+	// load the polyfill library
+	if ( ! prefixed_support )
+	{
+		folder = e.getPathTo( 'eCSStender.CSS3-grid-alignment.js' );
+		e.loadScript(
+			folder + 'eCSStender.CSS3-grid-alignment.polyfill.js',
+			function(){
+				if ( completed )
+				{
+					processGrids();
+				}
+				else
+				{
+					onComplete(processGrids);
+				}
+			}
+		);
 	}
 
 	// build the extension
@@ -166,14 +199,6 @@ Note:			If you change or improve on this script, please let us know by
 				collection = e.lookup( { fragment: GRID }, STAR );
 				function polyfill( selector, properties, media, specificity )
 				{
-					if ( ! polyfill_loaded )
-					{
-						setTimeout(function(){
-							polyfill(selector, properties, media, specificity);
-						},100);
-						return;
-					}
-					
 					var
 					els		= select( selector ),
 					eLen	= els.length,
@@ -210,7 +235,7 @@ Note:			If you change or improve on this script, please let us know by
 								}
 							}
 						}
-						new CSSGridAlignment( els[eLen], selector, properties, media, grid_items );
+						holdGridAlignment( els[eLen], selector, properties, media, grid_items );
 					}
 				}
 

@@ -1,3 +1,7 @@
+*v0.3* (2011-08-04)
+
+* Altered the loading scheme for the polyfill to ensure the grid layout is always triggered, even if the polyfill takes FOREVER to load.
+
 *v0.2* (2011-07-26)
 
 * Refactored extension file to ensure the Polyfill library is available is needed before attempting to execute a polyfill
