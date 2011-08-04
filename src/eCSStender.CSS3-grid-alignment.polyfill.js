@@ -1,13 +1,3 @@
-/*------------------------------------------------------------------------------
-Function:		eCSStender.CSS3-grid-alignment.polyfill.js
-Author:			Aaron Gustafson (aaron at easy-designs dot net)
-Creation Date:	2011-06-23
-Version:		0.2
-Homepage:		http://github.com/easy-designs/eCSStender.CSS3-grid-alignment.js
-License:		MIT License 
-Note:			If you change or improve on this script, please let us know by
-				emailing the author (above) with a link to your demo page.
-------------------------------------------------------------------------------*/
 (function(e){
 	
 	if ( typeof e == 'undefined' ){ return; }

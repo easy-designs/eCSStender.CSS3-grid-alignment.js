@@ -1,1 +1,11 @@
+/*------------------------------------------------------------------------------
+Function:		eCSStender.CSS3-grid-alignment.js
+Author:			Aaron Gustafson (aaron at easy-designs dot net)
+Creation Date:	2011-06-23
+Version:		0.3
+Homepage:		http://github.com/easy-designs/eCSStender.CSS3-grid-alignment.js
+License:		MIT License 
+Note:			If you change or improve on this script, please let us know by
+				emailing the author (above) with a link to your demo page.
+------------------------------------------------------------------------------*/
 (function(x){if(typeof x=="undefined"){return}var A,h=true,y="property",n="-moz-",k="-ms-",i="-o-",l="-webkit-",d="*",j=":",p=";",c="{",s="}",B="",u="display",g="grid",m=[],w=false,z=x.isSupported,v=x.onComplete,r,a,f;if(r=z(y,u+j+g)){return}v(function(){w=h});a=(z(y,u+j+k+g)||z(y,u+j+i+g)||z(y,u+j+l+g));function t(E,e,D,F,C){m.push({e:E,s:e,p:D,m:F,g:C})}function q(){var e=m.length,C;while(e--){C=m[e];new CSSGridAlignment(C.e,C.s,C.p,C.m,C.g)}}function b(e){return e!=A}function o(e,C){if(b(document.querySelectorAll)){o=function(D,E){return(E||document).querySelectorAll(D)}}else{if(!b(window.jQuery)){x.loadScript("http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js",function(){o(e,C)})}o=function(D,E){return window.jQuery(D,E).get()}}return o(e,C)}if(!a){f=x.getPathTo("eCSStender.CSS3-grid-alignment.js");x.loadScript(f+"eCSStender.CSS3-grid-alignment.polyfill.js",function(){if(w){q()}else{v(q)}})}x.register({property:u,filter:{value:/(inline-)?grid/},fingerprint:"net.easy-designs."+g},d,function(E,H,e,D){var C={},G,F;if(a){switch(h){case z(y,u+j+k+g):G=k;break;case z(y,u+j+n+g):G=n;break;case z(y,u+j+i+g):G=i;break;case z(y,u+j+l+g):G=l;break}function J(K,M,L){var P=B,N=B,R,O,M,Q;if(L in C){return}C[L]=h;F=x.lookup({fragment:g,media:L},d);R=F.length;while(R--){O=F[R];M=O.properties;N=O.selector+c;for(Q in M){if(!x.isInheritedProperty(M,Q)){if(Q.indexOf(g)>-1){N+=G+Q+j+M[Q]+p}else{if(M[Q].indexOf(g)>-1){N+=Q+j+G+M[Q]+p}}}}P=N+s+P}x.embedCSS(P,L)}J(E,H,e);return J}else{F=x.lookup({fragment:g},d);function I(O,S,K,N){var P=o(O),M=P.length,L,V,T,U,W,Q,R;while(M--){L=P[M].children;V=[];T=L.length;while(T--){U=F.length;while(U--){W=o(F[U].selector);Q=W.length;while(Q--){if(W[Q]==L[T]){V.push({element:L[T],details:F[U]});break}}}}t(P[M],O,S,K,V)}}I(E,H,e,D);return I}})})(eCSStender);
